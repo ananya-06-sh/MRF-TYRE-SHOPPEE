@@ -1,0 +1,1 @@
+// Placeholder: inventory data access.

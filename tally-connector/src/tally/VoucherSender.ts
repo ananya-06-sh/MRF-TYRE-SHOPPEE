@@ -1,0 +1,1 @@
+// Placeholder: idempotent voucher sender.

@@ -1,0 +1,1 @@
+// Placeholder: safe error handler.

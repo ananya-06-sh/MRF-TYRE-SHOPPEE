@@ -1,0 +1,1 @@
+// Placeholder: authentication state.

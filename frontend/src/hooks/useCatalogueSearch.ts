@@ -1,0 +1,1 @@
+// Placeholder: catalogue search hook.

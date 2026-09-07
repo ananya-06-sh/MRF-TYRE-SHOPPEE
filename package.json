@@ -1,0 +1,16 @@
+{
+  "name": "mrf-tyre-shoppee",
+  "version": "1.0.0",
+  "description": "Mobile-first inventory, billing, service management, and TallyPrime integration application.",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend",
+    "tally-connector"
+  ],
+  "scripts": {},
+  "engines": {
+    "node": ">=24",
+    "npm": ">=11"
+  }
+}

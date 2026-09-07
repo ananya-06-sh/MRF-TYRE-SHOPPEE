@@ -1,0 +1,1 @@
+// Placeholder: validated environment configuration.

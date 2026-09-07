@@ -1,0 +1,1 @@
+// Placeholder: stock movement model.

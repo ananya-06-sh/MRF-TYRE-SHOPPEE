@@ -1,0 +1,27 @@
+# Installed packages
+node_modules/
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+
+# IntelliJ local settings
+.idea/
+*.iml
+
+# Operating-system files
+.DS_Store
+Thumbs.db
