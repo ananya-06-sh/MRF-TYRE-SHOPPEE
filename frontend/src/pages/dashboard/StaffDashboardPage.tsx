@@ -1,40 +1,28 @@
-import { useMemo, useState } from "react";
-import ProductCard from "../../components/inventory/ProductCard";
-import { mockTyres } from "../../data/mockTyres";
-import { getStockStatus } from "../../types/inventory";
-import { useCart } from "../../context/CartContext";
-import { formatInr } from "../../utils/currency";
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import ProductCard from "../../components/inventory/ProductCard";
+import { useCart } from "../../context/CartContext";
+import { useCatalogueSearch } from "../../hooks/useCatalogueSearch";
+import { getStockStatus } from "../../types/inventory";
+import { formatInr } from "../../utils/currency";
 
 export default function StaffDashboardPage() {
     const [searchText, setSearchText] = useState("");
     const { totalQuantity, totalPrice } = useCart();
-    const filteredTyres = useMemo(() => {
-        const query = searchText.trim().toLowerCase();
 
-        if (!query) {
-            return mockTyres;
-        }
+    const { tyres: allTyres } = useCatalogueSearch("");
 
-        return mockTyres.filter((tyre) => {
-            const searchableText = [
-                tyre.productId,
-                tyre.patternAndSize,
-                tyre.category,
-                ...tyre.compatibleVehicles
-            ]
-                .join(" ")
-                .toLowerCase();
+    const {
+        tyres: filteredTyres,
+        isLoading,
+        errorMessage
+    } = useCatalogueSearch(searchText);
 
-            return searchableText.includes(query);
-        });
-    }, [searchText]);
-
-    const outOfStockCount = mockTyres.filter(
+    const outOfStockCount = allTyres.filter(
         (tyre) => getStockStatus(tyre) === "OUT_OF_STOCK"
     ).length;
 
-    const lowStockCount = mockTyres.filter(
+    const lowStockCount = allTyres.filter(
         (tyre) => getStockStatus(tyre) === "LOW_STOCK"
     ).length;
 
@@ -47,6 +35,7 @@ export default function StaffDashboardPage() {
                             <p className="text-xs font-bold uppercase text-red-600">
                                 MRF Tyre Shop
                             </p>
+
                             <h1 className="text-xl font-bold text-slate-900">
                                 Find a Tyre
                             </h1>
@@ -60,7 +49,9 @@ export default function StaffDashboardPage() {
                     <input
                         type="search"
                         value={searchText}
-                        onChange={(event) => setSearchText(event.target.value)}
+                        onChange={(event) =>
+                            setSearchText(event.target.value)
+                        }
                         placeholder="Search Activa, Swift, 165/80 R14..."
                         className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-base outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-100"
                     />
@@ -73,6 +64,7 @@ export default function StaffDashboardPage() {
                         <p className="text-2xl font-bold text-red-700">
                             {outOfStockCount}
                         </p>
+
                         <p className="text-sm font-medium text-red-700">
                             Out of Stock
                         </p>
@@ -82,6 +74,7 @@ export default function StaffDashboardPage() {
                         <p className="text-2xl font-bold text-amber-700">
                             {lowStockCount}
                         </p>
+
                         <p className="text-sm font-medium text-amber-700">
                             Low Stock
                         </p>
@@ -89,36 +82,61 @@ export default function StaffDashboardPage() {
                 </div>
 
                 <p className="mb-3 text-sm font-semibold text-slate-600">
-                    {filteredTyres.length} tyres found
+                    {isLoading
+                        ? "Searching inventory..."
+                        : `${filteredTyres.length} tyres found`}
                 </p>
 
-                <div className="space-y-4">
-                    {filteredTyres.map((tyre) => (
-                        <ProductCard
-                            key={tyre.productId}
-                            tyre={tyre}
-                        />
-                    ))}
-                </div>
-
-                {filteredTyres.length === 0 && (
-                    <div className="rounded-2xl bg-white p-8 text-center">
-                        <h2 className="font-bold text-slate-900">
-                            No matching tyre found
-                        </h2>
-                        <p className="mt-2 text-sm text-slate-500">
-                            Try searching by vehicle name or tyre size.
-                        </p>
+                {isLoading && (
+                    <div className="rounded-2xl bg-white p-6 text-center text-slate-500">
+                        Loading tyres...
                     </div>
                 )}
+
+                {errorMessage && (
+                    <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700">
+                        {errorMessage}
+                    </div>
+                )}
+
+                {!isLoading && !errorMessage && (
+                    <div className="space-y-4">
+                        {filteredTyres.map((tyre) => (
+                            <ProductCard
+                                key={tyre.productId}
+                                tyre={tyre}
+                            />
+                        ))}
+                    </div>
+                )}
+
+                {!isLoading &&
+                    !errorMessage &&
+                    filteredTyres.length === 0 && (
+                        <div className="rounded-2xl bg-white p-8 text-center">
+                            <h2 className="font-bold text-slate-900">
+                                No matching tyre found
+                            </h2>
+
+                            <p className="mt-2 text-sm text-slate-500">
+                                Try searching by vehicle name or tyre
+                                size.
+                            </p>
+                        </div>
+                    )}
             </section>
+
             {totalQuantity > 0 && (
                 <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white p-4 shadow-lg">
                     <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
                         <div>
                             <p className="text-sm font-semibold text-slate-900">
-                                {totalQuantity} {totalQuantity === 1 ? "tyre" : "tyres"}
+                                {totalQuantity}{" "}
+                                {totalQuantity === 1
+                                    ? "tyre"
+                                    : "tyres"}
                             </p>
+
                             <p className="text-lg font-bold text-red-600">
                                 {formatInr(totalPrice)}
                             </p>
