@@ -9,9 +9,11 @@ export class CatalogueService {
     private readonly inventoryRepository =
         new InventoryRepository();
 
-    search(searchText?: string): StaffProductDto[] {
+    async search(
+        searchText?: string
+    ): Promise<StaffProductDto[]> {
         const products =
-            this.inventoryRepository.findAllForStaff();
+            await this.inventoryRepository.findAllForStaff();
 
         const query = searchText?.trim().toLowerCase();
 
