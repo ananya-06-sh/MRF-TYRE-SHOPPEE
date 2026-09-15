@@ -13,25 +13,86 @@ enum TyreCategory {
   COMMERCIAL
 }
 
+enum UserRole {
+  ADMIN
+  STAFF
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum StockMovementType {
+  OPENING_STOCK
+  STOCK_IN
+  SALE
+  CUSTOMER_RETURN
+  SUPPLIER_RETURN
+  ADJUSTMENT
+}
+
 model InventoryItem {
-  id                     String       @id @default(uuid()) @db.Uuid
-  productId              String       @unique
-  billingMatchKey        String       @unique
+  id                     String          @id @default(uuid()) @db.Uuid
+  productId              String          @unique
+  billingMatchKey        String          @unique
   patternAndSize         String
   normalizedSize         String
   category               TyreCategory
-  compatibleVehicles     String[]     @default([])
-  currentStock           Int          @default(0)
-  lowStockTrigger        Int          @default(4)
+  compatibleVehicles     String[]        @default([])
+  currentStock           Int             @default(0)
+  lowStockTrigger        Int             @default(4)
   baseCostPaise          Int
-  gstRateBasisPoints     Int          @default(2800)
+  gstRateBasisPoints     Int             @default(2800)
   finalSellingPricePaise Int
-  isActive               Boolean      @default(true)
-  version                Int          @default(1)
-  createdAt              DateTime     @default(now())
-  updatedAt              DateTime     @updatedAt
+  isActive               Boolean         @default(true)
+  version                Int             @default(1)
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+  stockMovements         StockMovement[]
 
   @@index([normalizedSize])
   @@index([category])
   @@index([currentStock])
+}
+
+model User {
+  id              String          @id @default(uuid()) @db.Uuid
+  displayName     String
+  loginIdentifier String          @unique
+  passwordHash    String
+  role            UserRole
+  status          UserStatus      @default(ACTIVE)
+  canStockIn      Boolean         @default(false)
+  lastLoginAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  stockMovements  StockMovement[]
+
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}
+
+model StockMovement {
+  id              String            @id @default(uuid()) @db.Uuid
+  inventoryItemId String            @db.Uuid
+  performedById   String            @db.Uuid
+  type            StockMovementType
+  quantityChange  Int
+  stockBefore     Int
+  stockAfter      Int
+  unitCostPaise   Int?
+  supplierName    String?
+  referenceNumber String?
+  note            String?
+  occurredAt      DateTime          @default(now())
+  createdAt       DateTime          @default(now())
+
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+  performedBy   User          @relation(fields: [performedById], references: [id], onDelete: Restrict)
+
+  @@index([inventoryItemId, occurredAt])
+  @@index([performedById])
+  @@index([type])
 }

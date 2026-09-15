@@ -1,16 +1,30 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import {
+    Link,
+    useNavigate
+} from "react-router-dom";
 import ProductCard from "../../components/inventory/ProductCard";
+import { useAuth } from "../../context/AuthContext";
 import { useCart } from "../../context/CartContext";
 import { useCatalogueSearch } from "../../hooks/useCatalogueSearch";
 import { getStockStatus } from "../../types/inventory";
 import { formatInr } from "../../utils/currency";
 
 export default function StaffDashboardPage() {
-    const [searchText, setSearchText] = useState("");
-    const { totalQuantity, totalPrice } = useCart();
+    const navigate = useNavigate();
+    const { user, signOut } = useAuth();
 
-    const { tyres: allTyres } = useCatalogueSearch("");
+    const [searchText, setSearchText] =
+        useState("");
+
+    const {
+        totalQuantity,
+        totalPrice
+    } = useCart();
+
+    const {
+        tyres: allTyres
+    } = useCatalogueSearch("");
 
     const {
         tyres: filteredTyres,
@@ -19,18 +33,28 @@ export default function StaffDashboardPage() {
     } = useCatalogueSearch(searchText);
 
     const outOfStockCount = allTyres.filter(
-        (tyre) => getStockStatus(tyre) === "OUT_OF_STOCK"
+        (tyre) =>
+            getStockStatus(tyre) === "OUT_OF_STOCK"
     ).length;
 
     const lowStockCount = allTyres.filter(
-        (tyre) => getStockStatus(tyre) === "LOW_STOCK"
+        (tyre) =>
+            getStockStatus(tyre) === "LOW_STOCK"
     ).length;
+
+    async function handleLogout(): Promise<void> {
+        await signOut();
+
+        navigate("/login", {
+            replace: true
+        });
+    }
 
     return (
         <main className="min-h-screen bg-slate-100">
             <header className="sticky top-0 z-10 border-b border-slate-200 bg-white p-4 shadow-sm">
                 <div className="mx-auto max-w-3xl">
-                    <div className="mb-3 flex items-center justify-between">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <p className="text-xs font-bold uppercase text-red-600">
                                 MRF Tyre Shop
@@ -39,18 +63,54 @@ export default function StaffDashboardPage() {
                             <h1 className="text-xl font-bold text-slate-900">
                                 Find a Tyre
                             </h1>
+
+                            <p className="text-xs text-slate-500">
+                                {user?.displayName}
+                            </p>
                         </div>
 
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                            Staff
-                        </span>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                                {user?.role === "ADMIN"
+                                    ? "Admin"
+                                    : "Staff"}
+                            </span>
+
+                            {user?.role === "ADMIN" && (
+                                <Link
+                                    to="/admin"
+                                    className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-600"
+                                >
+                                    Admin
+                                </Link>
+                            )}
+
+                            <Link
+                                to="/account"
+                                className="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700"
+                            >
+                                Account
+                            </Link>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    void handleLogout();
+                                }}
+                                className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white"
+                            >
+                                Logout
+                            </button>
+                        </div>
                     </div>
 
                     <input
                         type="search"
                         value={searchText}
                         onChange={(event) =>
-                            setSearchText(event.target.value)
+                            setSearchText(
+                                event.target.value
+                            )
                         }
                         placeholder="Search Activa, Swift, 165/80 R14..."
                         className="w-full rounded-xl border border-slate-300 bg-slate-50 px-4 py-3 text-base outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-100"
@@ -119,8 +179,7 @@ export default function StaffDashboardPage() {
                             </h2>
 
                             <p className="mt-2 text-sm text-slate-500">
-                                Try searching by vehicle name or tyre
-                                size.
+                                Try searching by vehicle name or tyre size.
                             </p>
                         </div>
                     )}
@@ -141,6 +200,18 @@ export default function StaffDashboardPage() {
                                 {formatInr(totalPrice)}
                             </p>
                         </div>
+                        {user?.canStockIn && (
+                            <Link
+                                to={
+                                    user.role === "ADMIN"
+                                        ? "/admin/stock-in"
+                                        : "/stock-in"
+                                }
+                                className="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white"
+                            >
+                                Stock-In
+                            </Link>
+                        )}
 
                         <Link
                             to="/cart"

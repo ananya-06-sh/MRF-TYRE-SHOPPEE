@@ -19,7 +19,11 @@ const environmentSchema = z.object({
 
     DATABASE_URL: z
         .string()
-        .min(1, "DATABASE_URL is required")
+        .min(1, "DATABASE_URL is required"),
+
+    JWT_SECRET: z
+        .string()
+        .min(64, "JWT_SECRET must contain at least 64 characters")
 });
 
 const result = environmentSchema.safeParse(process.env);
