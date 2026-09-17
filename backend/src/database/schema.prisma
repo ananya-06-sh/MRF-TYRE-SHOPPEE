@@ -32,6 +32,12 @@ enum StockMovementType {
   ADJUSTMENT
 }
 
+enum OrderStatus {
+  CONFIRMED
+  TALLY_SYNCED
+  CANCELLED
+}
+
 model InventoryItem {
   id                     String          @id @default(uuid()) @db.Uuid
   productId              String          @unique
@@ -50,6 +56,7 @@ model InventoryItem {
   createdAt              DateTime        @default(now())
   updatedAt              DateTime        @updatedAt
   stockMovements         StockMovement[]
+  orderItems             OrderItem[]
 
   @@index([normalizedSize])
   @@index([category])
@@ -68,6 +75,7 @@ model User {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   stockMovements  StockMovement[]
+  orders          Order[]
 
   @@index([role])
   @@index([status])
@@ -78,6 +86,7 @@ model StockMovement {
   id              String            @id @default(uuid()) @db.Uuid
   inventoryItemId String            @db.Uuid
   performedById   String            @db.Uuid
+  orderId         String?           @db.Uuid
   type            StockMovementType
   quantityChange  Int
   stockBefore     Int
@@ -91,8 +100,80 @@ model StockMovement {
 
   inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
   performedBy   User          @relation(fields: [performedById], references: [id], onDelete: Restrict)
+  order         Order?        @relation(fields: [orderId], references: [id], onDelete: Restrict)
 
   @@index([inventoryItemId, occurredAt])
   @@index([performedById])
+  @@index([orderId])
   @@index([type])
+}
+
+model Order {
+  id                 String      @id @default(uuid()) @db.Uuid
+  billNumber         String      @unique
+  idempotencyKey     String      @unique
+  createdById        String      @db.Uuid
+  status             OrderStatus @default(CONFIRMED)
+  customerName       String?
+  customerMobile     String?
+  vehiclePlateNumber String?
+  vehicleModel       String?
+  productsTotalPaise Int
+  serviceTotalPaise  Int
+  includedTaxPaise   Int
+  grandTotalPaise    Int
+  tallyVoucherId     String?
+  tallySyncedAt      DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  createdBy      User               @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  items          OrderItem[]
+  services       OrderServiceLine[]
+  stockMovements StockMovement[]
+
+  @@index([createdById, createdAt])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id                      String   @id @default(uuid()) @db.Uuid
+  orderId                 String   @db.Uuid
+  inventoryItemId         String   @db.Uuid
+  productIdSnapshot       String
+  billingMatchKeySnapshot String
+  productNameSnapshot     String
+  quantity                Int
+  standardUnitPricePaise  Int
+  billedUnitPricePaise    Int
+  gstRateBasisPoints      Int
+  includedTaxPaise        Int
+  lineTotalPaise          Int
+  baseCostPaiseSnapshot   Int
+  createdAt               DateTime @default(now())
+
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, inventoryItemId])
+  @@index([inventoryItemId])
+}
+
+model OrderServiceLine {
+  id                     String   @id @default(uuid()) @db.Uuid
+  orderId                String   @db.Uuid
+  serviceIdSnapshot      String
+  serviceNameSnapshot    String
+  quantity               Int
+  standardUnitPricePaise Int
+  billedUnitPricePaise   Int
+  gstRateBasisPoints     Int
+  includedTaxPaise       Int
+  lineTotalPaise         Int
+  createdAt              DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
 }

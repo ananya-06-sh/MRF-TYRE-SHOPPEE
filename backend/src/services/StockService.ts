@@ -6,10 +6,12 @@ export interface AdminInventoryItem {
     productId: string;
     billingMatchKey: string;
     patternAndSize: string;
+    normalizedSize: string;
     category:
         | "TWO_WHEELER"
         | "PASSENGER_CAR"
         | "COMMERCIAL";
+    compatibleVehicles: string[];
     currentStock: number;
     lowStockTrigger: number;
     baseCostPaise: number;
@@ -17,6 +19,7 @@ export interface AdminInventoryItem {
     totalCostPaise: number;
     finalSellingPricePaise: number;
     profitPaise: number;
+    isActive: boolean;
 }
 
 export interface StockInInput {
@@ -61,12 +64,15 @@ export class StockService {
                     productId: true,
                     billingMatchKey: true,
                     patternAndSize: true,
+                    normalizedSize: true,
                     category: true,
+                    compatibleVehicles: true,
                     currentStock: true,
                     lowStockTrigger: true,
                     baseCostPaise: true,
                     gstRateBasisPoints: true,
-                    finalSellingPricePaise: true
+                    finalSellingPricePaise: true,
+                    isActive: true
                 },
                 orderBy: {
                     patternAndSize: "asc"

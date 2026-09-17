@@ -8,7 +8,9 @@ export interface AdminInventoryItem {
     productId: string;
     billingMatchKey: string;
     patternAndSize: string;
+    normalizedSize: string;
     category: AdminTyreCategory;
+    compatibleVehicles: string[];
     currentStock: number;
     lowStockTrigger: number;
     baseCostPaise: number;
@@ -16,6 +18,41 @@ export interface AdminInventoryItem {
     totalCostPaise: number;
     finalSellingPricePaise: number;
     profitPaise: number;
+    isActive: boolean;
+}
+
+export interface StaffStockInItem {
+    id: string;
+    productId: string;
+    billingMatchKey: string;
+    patternAndSize: string;
+    category: AdminTyreCategory;
+    currentStock: number;
+    lowStockTrigger: number;
+}
+
+export interface CreateInventoryInput {
+    productId: string;
+    billingMatchKey: string;
+    patternAndSize: string;
+    normalizedSize: string;
+    category: AdminTyreCategory;
+    compatibleVehicles: string[];
+    openingStock: number;
+    lowStockTrigger: number;
+    baseCostRupees: number;
+    finalSellingPriceRupees: number;
+}
+
+export interface UpdateInventoryInput {
+    billingMatchKey: string;
+    patternAndSize: string;
+    normalizedSize: string;
+    category: AdminTyreCategory;
+    compatibleVehicles: string[];
+    lowStockTrigger: number;
+    baseCostRupees: number;
+    finalSellingPriceRupees: number;
 }
 
 export interface StockInInput {
@@ -27,13 +64,4 @@ export interface StockInInput {
     occurredAt?: string;
     newBaseCostRupees?: number;
     newSellingPriceRupees?: number;
-}
-export interface StaffStockInItem {
-    id: string;
-    productId: string;
-    billingMatchKey: string;
-    patternAndSize: string;
-    category: AdminTyreCategory;
-    currentStock: number;
-    lowStockTrigger: number;
 }

@@ -3,8 +3,10 @@ import cors from "cors";
 import express from "express";
 import { database } from "./config/database.js";
 import { environment } from "./config/environment.js";
+import adminInventoryRouter from "./routes/adminInventory.routes.js";
 import authRouter from "./routes/auth.routes.js";
 import catalogueRouter from "./routes/catalogue.routes.js";
+import orderRouter from "./routes/order.routes.js";
 import staffAccountRouter from "./routes/staffAccount.routes.js";
 import stockRouter from "./routes/stock.routes.js";
 
@@ -22,6 +24,12 @@ app.use(cookieParser());
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/catalogue", catalogueRouter);
+app.use("/api/v1/orders", orderRouter);
+
+app.use(
+    "/api/v1/admin/inventory",
+    adminInventoryRouter
+);
 
 app.use(
     "/api/v1/admin/staff",

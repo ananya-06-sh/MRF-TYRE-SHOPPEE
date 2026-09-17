@@ -7,6 +7,8 @@ import {
 
 import ProtectedRoute from "../components/auth/ProtectedRoute";
 import AccountSettingsPage from "../pages/account/AccountSettingsPage";
+import AdminInventoryPage from "../pages/admin/AdminInventoryPage";
+import InventoryFormPage from "../pages/admin/InventoryFormPage";
 import QuickStockInPage from "../pages/admin/QuickStockInPage";
 import StaffAccountsPage from "../pages/admin/StaffAccountsPage";
 import LoginPage from "../pages/auth/LoginPage";
@@ -44,6 +46,39 @@ export default function AppRouter() {
                             allowedRoles={["ADMIN"]}
                         >
                             <AdminDashboardPage />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/admin/inventory"
+                    element={
+                        <ProtectedRoute
+                            allowedRoles={["ADMIN"]}
+                        >
+                            <AdminInventoryPage />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/admin/inventory/new"
+                    element={
+                        <ProtectedRoute
+                            allowedRoles={["ADMIN"]}
+                        >
+                            <InventoryFormPage />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/admin/inventory/:inventoryItemId/edit"
+                    element={
+                        <ProtectedRoute
+                            allowedRoles={["ADMIN"]}
+                        >
+                            <InventoryFormPage />
                         </ProtectedRoute>
                     }
                 />

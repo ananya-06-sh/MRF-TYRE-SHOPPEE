@@ -60,11 +60,27 @@ export default function AdminDashboardPage() {
                     className="rounded-2xl bg-white p-5 text-left shadow-sm hover:shadow-md"
                 >
                     <h2 className="text-lg font-bold text-slate-900">
-                        View Inventory
+                        Staff Inventory View
                     </h2>
 
                     <p className="mt-1 text-sm text-slate-500">
-                        Search tyres and check available stock.
+                        Search tyres as Staff members see them.
+                    </p>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() =>
+                        navigate("/admin/inventory")
+                    }
+                    className="rounded-2xl bg-white p-5 text-left shadow-sm hover:shadow-md"
+                >
+                    <h2 className="text-lg font-bold text-slate-900">
+                        Inventory Management
+                    </h2>
+
+                    <p className="mt-1 text-sm text-slate-500">
+                        Add tyres, edit prices and manage products.
                     </p>
                 </button>
 
@@ -96,7 +112,7 @@ export default function AdminDashboardPage() {
                     </h2>
 
                     <p className="mt-1 text-sm text-slate-500">
-                        Create and manage staff logins.
+                        Create accounts and control permissions.
                     </p>
                 </button>
 
@@ -105,7 +121,7 @@ export default function AdminDashboardPage() {
                     onClick={() =>
                         navigate("/account")
                     }
-                    className="rounded-2xl bg-white p-5 text-left shadow-sm hover:shadow-md"
+                    className="rounded-2xl bg-white p-5 text-left shadow-sm hover:shadow-md sm:col-span-2"
                 >
                     <h2 className="text-lg font-bold text-slate-900">
                         Account Settings
