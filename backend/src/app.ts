@@ -7,8 +7,10 @@ import adminInventoryRouter from "./routes/adminInventory.routes.js";
 import authRouter from "./routes/auth.routes.js";
 import catalogueRouter from "./routes/catalogue.routes.js";
 import orderRouter from "./routes/order.routes.js";
+import serviceJobRouter from "./routes/serviceJob.routes.js";
 import staffAccountRouter from "./routes/staffAccount.routes.js";
 import stockRouter from "./routes/stock.routes.js";
+import orderHistoryRouter from "./routes/orderHistory.routes.js";
 
 export const app = express();
 
@@ -25,6 +27,7 @@ app.use(cookieParser());
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/catalogue", catalogueRouter);
 app.use("/api/v1/orders", orderRouter);
+app.use("/api/v1/service-jobs", serviceJobRouter);
 
 app.use(
     "/api/v1/admin/inventory",
@@ -40,7 +43,10 @@ app.use(
     "/api/v1/admin/stock",
     stockRouter
 );
-
+app.use(
+    "/api/v1/order-history",
+    orderHistoryRouter
+);
 app.get(
     "/api/v1/health",
     async (_request, response) => {
@@ -49,7 +55,8 @@ app.get(
 
             response.status(200).json({
                 success: true,
-                message: "MRF Tyre Shop API is running",
+                message:
+                    "MRF Tyre Shop API is running",
                 database: "connected"
             });
         } catch {

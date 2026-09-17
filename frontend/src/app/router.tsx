@@ -9,6 +9,7 @@ import ProtectedRoute from "../components/auth/ProtectedRoute";
 import AccountSettingsPage from "../pages/account/AccountSettingsPage";
 import AdminInventoryPage from "../pages/admin/AdminInventoryPage";
 import InventoryFormPage from "../pages/admin/InventoryFormPage";
+import OrderHistoryPage from "../pages/admin/OrderHistoryPage";
 import QuickStockInPage from "../pages/admin/QuickStockInPage";
 import StaffAccountsPage from "../pages/admin/StaffAccountsPage";
 import LoginPage from "../pages/auth/LoginPage";
@@ -17,6 +18,7 @@ import CartPage from "../pages/cart/CartPage";
 import ServiceSelectionPage from "../pages/cart/ServiceSelectionPage";
 import AdminDashboardPage from "../pages/dashboard/AdminDashboardPage";
 import StaffDashboardPage from "../pages/dashboard/StaffDashboardPage";
+import ServiceJobsPage from "../pages/services/ServiceJobsPage";
 import StaffStockInPage from "../pages/stock/StaffStockInPage";
 
 export default function AppRouter() {
@@ -118,6 +120,17 @@ export default function AppRouter() {
                 />
 
                 <Route
+                    path="/admin/orders"
+                    element={
+                        <ProtectedRoute
+                            allowedRoles={["ADMIN"]}
+                        >
+                            <OrderHistoryPage />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
                     path="/account"
                     element={
                         <ProtectedRoute
@@ -157,6 +170,17 @@ export default function AppRouter() {
                             allowedRoles={["ADMIN", "STAFF"]}
                         >
                             <BillingPage />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/services"
+                    element={
+                        <ProtectedRoute
+                            allowedRoles={["ADMIN", "STAFF"]}
+                        >
+                            <ServiceJobsPage />
                         </ProtectedRoute>
                     }
                 />

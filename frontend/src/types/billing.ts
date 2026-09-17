@@ -33,3 +33,15 @@ export interface ConfirmedOrder {
         | "CANCELLED";
     alreadyConfirmed: boolean;
 }
+export interface BillingServiceInput {
+    serviceId: string;
+    serviceType:
+        | "ALIGNMENT"
+        | "BALANCING"
+        | "BOTH";
+    serviceName: string;
+    quantity: number;
+    standardUnitPriceRupees: number;
+    billedUnitPriceRupees: number;
+    gstRatePercent: number;
+}

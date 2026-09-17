@@ -92,6 +92,13 @@ export default function StaffDashboardPage() {
                                 Account
                             </Link>
 
+                            <Link
+                                to="/services"
+                                className="rounded-lg border border-blue-300 px-3 py-2 text-xs font-semibold text-blue-700"
+                            >
+                                Services
+                            </Link>
+
                             <button
                                 type="button"
                                 onClick={() => {

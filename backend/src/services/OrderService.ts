@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 import { database } from "../config/database.js";
 import {
     OrderStatus,
-    StockMovementType
+    StockMovementType,
+    type ServiceType
 } from "../generated/prisma/enums.js";
 
 export interface OrderProductInput {
@@ -13,6 +14,7 @@ export interface OrderProductInput {
 
 export interface OrderServiceInput {
     serviceId: string;
+    serviceType: ServiceType;
     serviceName: string;
     quantity: number;
     standardUnitPricePaise: number;
@@ -100,335 +102,412 @@ export class OrderService {
             };
         }
 
-        try {
-            const order = await database.$transaction(
-                async (transaction) => {
-                    const productIds =
-                        input.products.map(
-                            (product) =>
-                                product.productId
-                        );
+        if (
+            input.service &&
+            (!input.vehiclePlateNumber?.trim() ||
+                !input.vehicleModel?.trim())
+        ) {
+            throw new Error(
+                "Vehicle details are required for a service job"
+            );
+        }
 
-                    const inventoryItems =
-                        await transaction
-                            .inventoryItem
-                            .findMany({
-                                where: {
-                                    productId: {
-                                        in: productIds
-                                    },
-                                    isActive: true
+        try {
+            const order =
+                await database.$transaction(
+                    async (transaction) => {
+                        const productIds =
+                            input.products.map(
+                                (product) =>
+                                    product.productId
+                            );
+
+                        const inventoryItems =
+                            await transaction
+                                .inventoryItem
+                                .findMany({
+                                    where: {
+                                        productId: {
+                                            in: productIds
+                                        },
+                                        isActive: true
+                                    }
+                                });
+
+                        const inventoryByProductId =
+                            new Map(
+                                inventoryItems.map(
+                                    (item) => [
+                                        item.productId,
+                                        item
+                                    ]
+                                )
+                            );
+
+                        const calculatedProductLines =
+                            input.products.map(
+                                (product) => {
+                                    const inventoryItem =
+                                        inventoryByProductId.get(
+                                            product.productId
+                                        );
+
+                                    if (!inventoryItem) {
+                                        throw new OrderCreationError(
+                                            "PRODUCT_NOT_FOUND",
+                                            product.productId
+                                        );
+                                    }
+
+                                    if (
+                                        inventoryItem.currentStock <
+                                        product.quantity
+                                    ) {
+                                        throw new OrderCreationError(
+                                            "INSUFFICIENT_STOCK",
+                                            product.productId
+                                        );
+                                    }
+
+                                    const lineTotalPaise =
+                                        product.billedUnitPricePaise *
+                                        product.quantity;
+
+                                    const includedTaxPaise =
+                                        calculateIncludedTax(
+                                            lineTotalPaise,
+                                            inventoryItem
+                                                .gstRateBasisPoints
+                                        );
+
+                                    return {
+                                        input: product,
+                                        inventoryItem,
+                                        lineTotalPaise,
+                                        includedTaxPaise
+                                    };
+                                }
+                            );
+
+                        const serviceLine =
+                            input.service
+                                ? {
+                                    ...input.service,
+                                    lineTotalPaise:
+                                        input.service
+                                            .billedUnitPricePaise *
+                                        input.service
+                                            .quantity,
+                                    includedTaxPaise:
+                                        calculateIncludedTax(
+                                            input.service
+                                                .billedUnitPricePaise *
+                                            input.service
+                                                .quantity,
+                                            input.service
+                                                .gstRateBasisPoints
+                                        )
+                                }
+                                : null;
+
+                        const productsTotalPaise =
+                            calculatedProductLines.reduce(
+                                (total, line) =>
+                                    total +
+                                    line.lineTotalPaise,
+                                0
+                            );
+
+                        const serviceTotalPaise =
+                            serviceLine
+                                ?.lineTotalPaise ?? 0;
+
+                        const includedTaxPaise =
+                            calculatedProductLines.reduce(
+                                (total, line) =>
+                                    total +
+                                    line.includedTaxPaise,
+                                0
+                            ) +
+                            (serviceLine
+                                    ?.includedTaxPaise ??
+                                0);
+
+                        const grandTotalPaise =
+                            productsTotalPaise +
+                            serviceTotalPaise;
+
+                        const billNumber =
+                            `MRF-${Date.now()}-${randomUUID()
+                                .slice(0, 8)
+                                .toUpperCase()}`;
+
+                        const createdOrder =
+                            await transaction.order.create({
+                                data: {
+                                    billNumber,
+                                    idempotencyKey:
+                                    input.idempotencyKey,
+                                    createdById,
+                                    status:
+                                    OrderStatus.CONFIRMED,
+                                    customerName:
+                                        input.customerName
+                                            ?.trim() ||
+                                        null,
+                                    customerMobile:
+                                        input.customerMobile
+                                            ?.trim() ||
+                                        null,
+                                    vehiclePlateNumber:
+                                        input.vehiclePlateNumber
+                                            ?.trim()
+                                            .toUpperCase() ||
+                                        null,
+                                    vehicleModel:
+                                        input.vehicleModel
+                                            ?.trim() ||
+                                        null,
+                                    productsTotalPaise,
+                                    serviceTotalPaise,
+                                    includedTaxPaise,
+                                    grandTotalPaise
                                 }
                             });
 
-                    const inventoryByProductId =
-                        new Map(
-                            inventoryItems.map(
-                                (item) => [
-                                    item.productId,
-                                    item
-                                ]
-                            )
-                        );
+                        for (
+                            const line of
+                            calculatedProductLines
+                            ) {
+                            const updateResult =
+                                await transaction
+                                    .inventoryItem
+                                    .updateMany({
+                                        where: {
+                                            id: line
+                                                .inventoryItem
+                                                .id,
+                                            isActive: true,
+                                            currentStock: {
+                                                gte: line
+                                                    .input
+                                                    .quantity
+                                            }
+                                        },
+                                        data: {
+                                            currentStock: {
+                                                decrement:
+                                                line
+                                                    .input
+                                                    .quantity
+                                            },
+                                            version: {
+                                                increment: 1
+                                            }
+                                        }
+                                    });
 
-                    const calculatedProductLines =
-                        input.products.map(
-                            (product) => {
-                                const inventoryItem =
-                                    inventoryByProductId.get(
-                                        product.productId
-                                    );
-
-                                if (!inventoryItem) {
-                                    throw new OrderCreationError(
-                                        "PRODUCT_NOT_FOUND",
-                                        product.productId
-                                    );
-                                }
-
-                                if (
-                                    inventoryItem.currentStock <
-                                    product.quantity
-                                ) {
-                                    throw new OrderCreationError(
-                                        "INSUFFICIENT_STOCK",
-                                        product.productId
-                                    );
-                                }
-
-                                const lineTotalPaise =
-                                    product.billedUnitPricePaise *
-                                    product.quantity;
-
-                                const includedTaxPaise =
-                                    calculateIncludedTax(
-                                        lineTotalPaise,
-                                        inventoryItem
-                                            .gstRateBasisPoints
-                                    );
-
-                                return {
-                                    input: product,
-                                    inventoryItem,
-                                    lineTotalPaise,
-                                    includedTaxPaise
-                                };
+                            if (
+                                updateResult.count !== 1
+                            ) {
+                                throw new OrderCreationError(
+                                    "INSUFFICIENT_STOCK",
+                                    line.input.productId
+                                );
                             }
-                        );
 
-                    const serviceLine = input.service
-                        ? {
-                            ...input.service,
-                            lineTotalPaise:
-                                input.service
-                                    .billedUnitPricePaise *
-                                input.service.quantity,
-                            includedTaxPaise:
-                                calculateIncludedTax(
-                                    input.service
-                                        .billedUnitPricePaise *
-                                    input.service
-                                        .quantity,
-                                    input.service
-                                        .gstRateBasisPoints
-                                )
-                        }
-                        : null;
+                            const updatedInventory =
+                                await transaction
+                                    .inventoryItem
+                                    .findUniqueOrThrow({
+                                        where: {
+                                            id: line
+                                                .inventoryItem
+                                                .id
+                                        },
+                                        select: {
+                                            currentStock:
+                                                true
+                                        }
+                                    });
 
-                    const productsTotalPaise =
-                        calculatedProductLines.reduce(
-                            (total, line) =>
-                                total +
-                                line.lineTotalPaise,
-                            0
-                        );
-
-                    const serviceTotalPaise =
-                        serviceLine?.lineTotalPaise ??
-                        0;
-
-                    const includedTaxPaise =
-                        calculatedProductLines.reduce(
-                            (total, line) =>
-                                total +
-                                line.includedTaxPaise,
-                            0
-                        ) +
-                        (serviceLine
-                            ?.includedTaxPaise ?? 0);
-
-                    const grandTotalPaise =
-                        productsTotalPaise +
-                        serviceTotalPaise;
-
-                    const billNumber =
-                        `MRF-${Date.now()}-${randomUUID()
-                            .slice(0, 8)
-                            .toUpperCase()}`;
-
-                    const createdOrder =
-                        await transaction.order.create({
-                            data: {
-                                billNumber,
-                                idempotencyKey:
-                                input.idempotencyKey,
-                                createdById,
-                                status:
-                                OrderStatus.CONFIRMED,
-                                customerName:
-                                    input.customerName
-                                        ?.trim() || null,
-                                customerMobile:
-                                    input.customerMobile
-                                        ?.trim() || null,
-                                vehiclePlateNumber:
-                                    input.vehiclePlateNumber
-                                        ?.trim()
-                                        .toUpperCase() ||
-                                    null,
-                                vehicleModel:
-                                    input.vehicleModel
-                                        ?.trim() || null,
-                                productsTotalPaise,
-                                serviceTotalPaise,
-                                includedTaxPaise,
-                                grandTotalPaise
-                            }
-                        });
-
-                    for (const line of calculatedProductLines) {
-                        const updateResult =
                             await transaction
-                                .inventoryItem
-                                .updateMany({
-                                    where: {
-                                        id: line
+                                .orderItem
+                                .create({
+                                    data: {
+                                        orderId:
+                                        createdOrder.id,
+                                        inventoryItemId:
+                                        line
                                             .inventoryItem
                                             .id,
-                                        isActive: true,
-                                        currentStock: {
-                                            gte: line.input
-                                                .quantity
-                                        }
-                                    },
-                                    data: {
-                                        currentStock: {
-                                            decrement:
-                                            line.input
-                                                .quantity
-                                        },
-                                        version: {
-                                            increment: 1
-                                        }
-                                    }
-                                });
-
-                        if (updateResult.count !== 1) {
-                            throw new OrderCreationError(
-                                "INSUFFICIENT_STOCK",
-                                line.input.productId
-                            );
-                        }
-
-                        const updatedInventory =
-                            await transaction
-                                .inventoryItem
-                                .findUniqueOrThrow({
-                                    where: {
-                                        id: line
+                                        productIdSnapshot:
+                                        line
                                             .inventoryItem
-                                            .id
-                                    },
-                                    select: {
-                                        currentStock: true
-                                    }
-                                });
-
-                        await transaction.orderItem.create({
-                            data: {
-                                orderId:
-                                createdOrder.id,
-                                inventoryItemId:
-                                line.inventoryItem.id,
-                                productIdSnapshot:
-                                line.inventoryItem
-                                    .productId,
-                                billingMatchKeySnapshot:
-                                line.inventoryItem
-                                    .billingMatchKey,
-                                productNameSnapshot:
-                                line.inventoryItem
-                                    .patternAndSize,
-                                quantity:
-                                line.input.quantity,
-                                standardUnitPricePaise:
-                                line.inventoryItem
-                                    .finalSellingPricePaise,
-                                billedUnitPricePaise:
-                                line.input
-                                    .billedUnitPricePaise,
-                                gstRateBasisPoints:
-                                line.inventoryItem
-                                    .gstRateBasisPoints,
-                                includedTaxPaise:
-                                line.includedTaxPaise,
-                                lineTotalPaise:
-                                line.lineTotalPaise,
-                                baseCostPaiseSnapshot:
-                                line.inventoryItem
-                                    .baseCostPaise
-                            }
-                        });
-
-                        await transaction
-                            .stockMovement
-                            .create({
-                                data: {
-                                    inventoryItemId:
-                                    line.inventoryItem
-                                        .id,
-                                    performedById:
-                                    createdById,
-                                    orderId:
-                                    createdOrder.id,
-                                    type:
-                                    StockMovementType.SALE,
-                                    quantityChange:
-                                        -line.input
-                                            .quantity,
-                                    stockBefore:
-                                        updatedInventory
-                                            .currentStock +
+                                            .productId,
+                                        billingMatchKeySnapshot:
+                                        line
+                                            .inventoryItem
+                                            .billingMatchKey,
+                                        productNameSnapshot:
+                                        line
+                                            .inventoryItem
+                                            .patternAndSize,
+                                        quantity:
                                         line.input
                                             .quantity,
-                                    stockAfter:
-                                    updatedInventory
-                                        .currentStock,
-                                    unitCostPaise:
-                                    line.inventoryItem
-                                        .baseCostPaise,
-                                    referenceNumber:
-                                    billNumber,
-                                    note:
-                                        "Stock deducted from confirmed bill"
-                                }
-                            });
-                    }
+                                        standardUnitPricePaise:
+                                        line
+                                            .inventoryItem
+                                            .finalSellingPricePaise,
+                                        billedUnitPricePaise:
+                                        line.input
+                                            .billedUnitPricePaise,
+                                        gstRateBasisPoints:
+                                        line
+                                            .inventoryItem
+                                            .gstRateBasisPoints,
+                                        includedTaxPaise:
+                                        line
+                                            .includedTaxPaise,
+                                        lineTotalPaise:
+                                        line
+                                            .lineTotalPaise,
+                                        baseCostPaiseSnapshot:
+                                        line
+                                            .inventoryItem
+                                            .baseCostPaise
+                                    }
+                                });
 
-                    if (serviceLine) {
-                        await transaction
-                            .orderServiceLine
-                            .create({
-                                data: {
-                                    orderId:
-                                    createdOrder.id,
-                                    serviceIdSnapshot:
-                                    serviceLine.serviceId,
-                                    serviceNameSnapshot:
-                                    serviceLine.serviceName,
-                                    quantity:
-                                    serviceLine.quantity,
-                                    standardUnitPricePaise:
-                                    serviceLine
-                                        .standardUnitPricePaise,
-                                    billedUnitPricePaise:
-                                    serviceLine
-                                        .billedUnitPricePaise,
-                                    gstRateBasisPoints:
-                                    serviceLine
-                                        .gstRateBasisPoints,
-                                    includedTaxPaise:
-                                    serviceLine
-                                        .includedTaxPaise,
-                                    lineTotalPaise:
-                                    serviceLine
-                                        .lineTotalPaise
-                                }
-                            });
-                    }
+                            await transaction
+                                .stockMovement
+                                .create({
+                                    data: {
+                                        inventoryItemId:
+                                        line
+                                            .inventoryItem
+                                            .id,
+                                        performedById:
+                                        createdById,
+                                        orderId:
+                                        createdOrder.id,
+                                        type:
+                                        StockMovementType.SALE,
+                                        quantityChange:
+                                            -line.input
+                                                .quantity,
+                                        stockBefore:
+                                            updatedInventory
+                                                .currentStock +
+                                            line.input
+                                                .quantity,
+                                        stockAfter:
+                                        updatedInventory
+                                            .currentStock,
+                                        unitCostPaise:
+                                        line
+                                            .inventoryItem
+                                            .baseCostPaise,
+                                        referenceNumber:
+                                        billNumber,
+                                        note:
+                                            "Stock deducted from confirmed bill"
+                                    }
+                                });
+                        }
 
-                    return {
-                        id: createdOrder.id,
-                        billNumber:
-                        createdOrder.billNumber,
-                        grandTotalPaise:
-                        createdOrder.grandTotalPaise,
-                        status: createdOrder.status,
-                        alreadyConfirmed: false
-                    };
-                }
-            );
+                        if (serviceLine) {
+                            await transaction
+                                .orderServiceLine
+                                .create({
+                                    data: {
+                                        orderId:
+                                        createdOrder.id,
+                                        serviceIdSnapshot:
+                                        serviceLine
+                                            .serviceId,
+                                        serviceNameSnapshot:
+                                        serviceLine
+                                            .serviceName,
+                                        quantity:
+                                        serviceLine
+                                            .quantity,
+                                        standardUnitPricePaise:
+                                        serviceLine
+                                            .standardUnitPricePaise,
+                                        billedUnitPricePaise:
+                                        serviceLine
+                                            .billedUnitPricePaise,
+                                        gstRateBasisPoints:
+                                        serviceLine
+                                            .gstRateBasisPoints,
+                                        includedTaxPaise:
+                                        serviceLine
+                                            .includedTaxPaise,
+                                        lineTotalPaise:
+                                        serviceLine
+                                            .lineTotalPaise
+                                    }
+                                });
+
+                            const jobNumber =
+                                `JOB-${Date.now()}-${randomUUID()
+                                    .slice(0, 6)
+                                    .toUpperCase()}`;
+
+                            await transaction
+                                .serviceJob
+                                .create({
+                                    data: {
+                                        jobNumber,
+                                        orderId:
+                                        createdOrder.id,
+                                        createdById,
+                                        vehiclePlateNumber:
+                                            input
+                                                .vehiclePlateNumber!
+                                                .trim()
+                                                .toUpperCase(),
+                                        vehicleModel:
+                                            input
+                                                .vehicleModel!
+                                                .trim(),
+                                        serviceType:
+                                        serviceLine
+                                            .serviceType
+                                    }
+                                });
+                        }
+
+                        return {
+                            id: createdOrder.id,
+                            billNumber:
+                            createdOrder.billNumber,
+                            grandTotalPaise:
+                            createdOrder
+                                .grandTotalPaise,
+                            status:
+                            createdOrder.status,
+                            alreadyConfirmed: false
+                        };
+                    }
+                );
 
             return {
                 success: true,
                 order
             };
         } catch (error: unknown) {
-            if (error instanceof OrderCreationError) {
+            if (
+                error instanceof
+                OrderCreationError
+            ) {
                 return {
                     success: false,
                     reason: error.code,
-                    productId: error.productId
+                    productId:
+                    error.productId
                 };
             }
 

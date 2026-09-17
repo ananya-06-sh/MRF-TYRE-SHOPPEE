@@ -3,13 +3,9 @@ import { useAuth } from "../../context/AuthContext";
 
 export default function AdminDashboardPage() {
     const navigate = useNavigate();
+    const { user, signOut } = useAuth();
 
-    const {
-        user,
-        signOut
-    } = useAuth();
-
-    async function handleLogout(): Promise<void> {
+    async function handleLogout() {
         await signOut();
 
         navigate("/login", {
@@ -19,33 +15,31 @@ export default function AdminDashboardPage() {
 
     return (
         <main className="min-h-screen bg-slate-100">
-            <header className="border-b border-slate-200 bg-white p-4">
-                <div className="mx-auto flex max-w-5xl items-center justify-between gap-4">
+            <header className="border-b border-slate-200 bg-white p-5">
+                <div className="mx-auto flex max-w-5xl items-start justify-between gap-4">
                     <div>
-                        <p className="text-sm font-bold text-red-600">
-                            MRF TYRE SHOP
+                        <p className="text-sm font-bold uppercase text-red-600">
+                            MRF Tyre Shop
                         </p>
 
-                        <h1 className="text-2xl font-bold text-slate-900">
+                        <h1 className="text-3xl font-bold text-slate-900">
                             Admin Dashboard
                         </h1>
 
-                        <p className="mt-1 text-sm text-slate-500">
-                            Welcome, {user?.displayName}
+                        <p className="mt-1 text-slate-500">
+                            Welcome, {user?.displayName ?? "Admin"}
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <span className="rounded-full bg-red-100 px-3 py-1 text-sm font-semibold text-red-700">
+                    <div className="flex items-center gap-3">
+                        <span className="rounded-full bg-red-100 px-4 py-2 text-sm font-semibold text-red-700">
                             Admin
                         </span>
 
                         <button
                             type="button"
-                            onClick={() => {
-                                void handleLogout();
-                            }}
-                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
+                            onClick={handleLogout}
+                            className="rounded-xl border border-slate-300 bg-white px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50"
                         >
                             Logout
                         </button>
@@ -53,85 +47,89 @@ export default function AdminDashboardPage() {
                 </div>
             </header>
 
-            <section className="mx-auto grid max-w-5xl gap-4 p-4 sm:grid-cols-2">
-                <button
-                    type="button"
+            <section className="mx-auto grid max-w-5xl gap-5 p-5 sm:grid-cols-2">
+                <DashboardCard
+                    title="Staff Inventory View"
+                    description="Search tyres as Staff members see them."
                     onClick={() => navigate("/")}
-                    className="rounded-2xl bg-white p-5 text-left shadow-sm hover:shadow-md"
-                >
-                    <h2 className="text-lg font-bold text-slate-900">
-                        Staff Inventory View
-                    </h2>
+                />
 
-                    <p className="mt-1 text-sm text-slate-500">
-                        Search tyres as Staff members see them.
-                    </p>
-                </button>
-
-                <button
-                    type="button"
+                <DashboardCard
+                    title="Inventory Management"
+                    description="Add tyres, edit prices and manage products."
                     onClick={() =>
                         navigate("/admin/inventory")
                     }
-                    className="rounded-2xl bg-white p-5 text-left shadow-sm hover:shadow-md"
-                >
-                    <h2 className="text-lg font-bold text-slate-900">
-                        Inventory Management
-                    </h2>
+                />
 
-                    <p className="mt-1 text-sm text-slate-500">
-                        Add tyres, edit prices and manage products.
-                    </p>
-                </button>
-
-                <button
-                    type="button"
+                <DashboardCard
+                    title="Quick Stock-In"
+                    description="Record newly received tyre stock."
                     onClick={() =>
                         navigate("/admin/stock-in")
                     }
-                    className="rounded-2xl bg-white p-5 text-left shadow-sm hover:shadow-md"
-                >
-                    <h2 className="text-lg font-bold text-slate-900">
-                        Quick Stock-In
-                    </h2>
+                />
 
-                    <p className="mt-1 text-sm text-slate-500">
-                        Record newly received tyre stock.
-                    </p>
-                </button>
-
-                <button
-                    type="button"
+                <DashboardCard
+                    title="Staff Accounts"
+                    description="Create accounts and control permissions."
                     onClick={() =>
                         navigate("/admin/staff")
                     }
-                    className="rounded-2xl bg-white p-5 text-left shadow-sm hover:shadow-md"
-                >
-                    <h2 className="text-lg font-bold text-slate-900">
-                        Staff Accounts
-                    </h2>
+                />
 
-                    <p className="mt-1 text-sm text-slate-500">
-                        Create accounts and control permissions.
-                    </p>
-                </button>
+                <DashboardCard
+                    title="Sales & Bill History"
+                    description="View confirmed bills and transaction details."
+                    onClick={() =>
+                        navigate("/admin/orders")
+                    }
+                />
 
-                <button
-                    type="button"
+                <DashboardCard
+                    title="Service Jobs"
+                    description="Track alignment and balancing work."
+                    onClick={() =>
+                        navigate("/services")
+                    }
+                />
+
+                <DashboardCard
+                    title="Account Settings"
+                    description="Change your login ID or password."
                     onClick={() =>
                         navigate("/account")
                     }
-                    className="rounded-2xl bg-white p-5 text-left shadow-sm hover:shadow-md sm:col-span-2"
-                >
-                    <h2 className="text-lg font-bold text-slate-900">
-                        Account Settings
-                    </h2>
-
-                    <p className="mt-1 text-sm text-slate-500">
-                        Change your login ID or password.
-                    </p>
-                </button>
+                />
             </section>
         </main>
+    );
+}
+
+interface DashboardCardProps {
+    title: string;
+    description: string;
+    onClick: () => void;
+}
+
+function DashboardCard({
+                           title,
+                           description,
+                           onClick
+                       }: DashboardCardProps) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className="rounded-2xl bg-white p-6 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+        >
+            <h2 className="text-xl font-bold text-slate-900">
+                {title}
+            </h2>
+
+            <p className="mt-2 text-slate-500">
+                {description}
+            </p>
+        </button>
     );
 }

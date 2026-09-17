@@ -178,6 +178,10 @@ export default function BillingPage() {
                         serviceLine
                             .selectedService
                             .service.serviceId,
+                        serviceType:
+                        serviceLine
+                            .selectedService
+                            .service.serviceType,
                         serviceName:
                         serviceLine
                             .selectedService
@@ -354,7 +358,14 @@ export default function BillingPage() {
                                     event.target.value
                                 )
                             }
-                            placeholder="Vehicle plate number"
+                            placeholder={
+                                selectedService
+                                    ? "Vehicle plate number (required)"
+                                    : "Vehicle plate number"
+                            }
+                            required={
+                                selectedService !== null
+                            }
                             className="rounded-xl border border-slate-300 px-4 py-3 uppercase outline-none focus:border-red-500"
                         />
 
@@ -366,7 +377,14 @@ export default function BillingPage() {
                                     event.target.value
                                 )
                             }
-                            placeholder="Vehicle model"
+                            placeholder={
+                                selectedService
+                                    ? "Vehicle model (required)"
+                                    : "Vehicle model"
+                            }
+                            required={
+                                selectedService !== null
+                            }
                             className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-red-500"
                         />
                     </div>
@@ -405,8 +423,7 @@ export default function BillingPage() {
                                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                                     <div>
                                         <label className="text-xs font-semibold text-slate-500">
-                                            Standard unit
-                                            price
+                                            Standard unit price
                                         </label>
 
                                         <p className="mt-1 rounded-xl bg-slate-100 px-4 py-3 font-semibold">
@@ -419,23 +436,17 @@ export default function BillingPage() {
 
                                     <div>
                                         <label className="text-xs font-semibold text-slate-500">
-                                            Billing unit
-                                            price
+                                            Billing unit price
                                         </label>
 
                                         <input
                                             type="number"
                                             min="0"
                                             step="0.01"
-                                            value={
-                                                unitPrice
-                                            }
-                                            onChange={(
-                                                event
-                                            ) =>
+                                            value={unitPrice}
+                                            onChange={(event) =>
                                                 updateBillingPrice(
-                                                    item
-                                                        .tyre
+                                                    item.tyre
                                                         .productId,
                                                     Number(
                                                         event
@@ -542,6 +553,26 @@ export default function BillingPage() {
                                         className="mt-1 w-full rounded-xl border border-red-300 px-4 py-3 font-bold outline-none focus:border-red-600"
                                     />
                                 </div>
+                            </div>
+
+                            <div className="mt-4 flex justify-between border-t border-slate-100 pt-3 text-sm">
+                                <span className="text-slate-500">
+                                    Included GST (
+                                    {
+                                        serviceLine
+                                            .selectedService
+                                            .service
+                                            .gstRatePercent
+                                    }
+                                    %)
+                                </span>
+
+                                <span>
+                                    {formatInr(
+                                        serviceLine.tax
+                                            .taxAmount
+                                    )}
+                                </span>
                             </div>
                         </article>
                     </section>

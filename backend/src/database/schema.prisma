@@ -38,6 +38,17 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum ServiceType {
+  ALIGNMENT
+  BALANCING
+  BOTH
+}
+
+enum ServiceJobStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
 model InventoryItem {
   id                     String          @id @default(uuid()) @db.Uuid
   productId              String          @unique
@@ -64,18 +75,19 @@ model InventoryItem {
 }
 
 model User {
-  id              String          @id @default(uuid()) @db.Uuid
-  displayName     String
-  loginIdentifier String          @unique
-  passwordHash    String
-  role            UserRole
-  status          UserStatus      @default(ACTIVE)
-  canStockIn      Boolean         @default(false)
-  lastLoginAt     DateTime?
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
-  stockMovements  StockMovement[]
-  orders          Order[]
+  id                 String          @id @default(uuid()) @db.Uuid
+  displayName        String
+  loginIdentifier    String          @unique
+  passwordHash       String
+  role               UserRole
+  status             UserStatus      @default(ACTIVE)
+  canStockIn         Boolean         @default(false)
+  lastLoginAt        DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  stockMovements     StockMovement[]
+  orders             Order[]
+  serviceJobsCreated ServiceJob[]
 
   @@index([role])
   @@index([status])
@@ -131,6 +143,7 @@ model Order {
   items          OrderItem[]
   services       OrderServiceLine[]
   stockMovements StockMovement[]
+  serviceJob     ServiceJob?
 
   @@index([createdById, createdAt])
   @@index([status])
@@ -176,4 +189,27 @@ model OrderServiceLine {
   order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
 
   @@index([orderId])
+}
+
+model ServiceJob {
+  id                 String           @id @default(uuid()) @db.Uuid
+  jobNumber          String           @unique
+  orderId            String?          @unique @db.Uuid
+  createdById        String           @db.Uuid
+  vehiclePlateNumber String
+  vehicleModel       String
+  serviceType        ServiceType
+  assignedTechnician String?
+  status             ServiceJobStatus @default(IN_PROGRESS)
+  completedAt        DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  order     Order? @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  createdBy User   @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([status])
+  @@index([createdById])
+  @@index([createdAt])
+  @@index([vehiclePlateNumber])
 }
