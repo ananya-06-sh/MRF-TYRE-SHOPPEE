@@ -11,6 +11,7 @@ import serviceJobRouter from "./routes/serviceJob.routes.js";
 import staffAccountRouter from "./routes/staffAccount.routes.js";
 import stockRouter from "./routes/stock.routes.js";
 import orderHistoryRouter from "./routes/orderHistory.routes.js";
+import inventoryImportRouter from "./routes/inventoryImport.routes.js";
 
 export const app = express();
 
@@ -46,6 +47,10 @@ app.use(
 app.use(
     "/api/v1/order-history",
     orderHistoryRouter
+);
+app.use(
+    "/api/v1/inventory-import",
+    inventoryImportRouter
 );
 app.get(
     "/api/v1/health",

@@ -20,6 +20,7 @@ import AdminDashboardPage from "../pages/dashboard/AdminDashboardPage";
 import StaffDashboardPage from "../pages/dashboard/StaffDashboardPage";
 import ServiceJobsPage from "../pages/services/ServiceJobsPage";
 import StaffStockInPage from "../pages/stock/StaffStockInPage";
+import InventoryImportPage from "../pages/admin/InventoryImportPage";
 
 export default function AppRouter() {
     return (
@@ -74,6 +75,16 @@ export default function AppRouter() {
                     }
                 />
 
+                <Route
+                    path="/admin/inventory/import"
+                    element={
+                        <ProtectedRoute
+                            allowedRoles={["ADMIN"]}
+                        >
+                            <InventoryImportPage />
+                        </ProtectedRoute>
+                    }
+                />
                 <Route
                     path="/admin/inventory/:inventoryItemId/edit"
                     element={

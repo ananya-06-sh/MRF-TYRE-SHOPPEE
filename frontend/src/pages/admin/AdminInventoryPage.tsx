@@ -143,12 +143,21 @@ export default function AdminInventoryPage() {
                         </p>
                     </div>
 
-                    <Link
-                        to="/admin/inventory/new"
-                        className="rounded-xl bg-red-600 px-4 py-3 font-semibold text-white"
-                    >
-                        Add New Tyre
-                    </Link>
+                    <div className="flex flex-wrap gap-3">
+                        <Link
+                            to="/admin/inventory/import"
+                            className="rounded-xl border border-red-300 bg-white px-4 py-3 font-semibold text-red-600 hover:bg-red-50"
+                        >
+                            Import CSV
+                        </Link>
+
+                        <Link
+                            to="/admin/inventory/new"
+                            className="rounded-xl bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-700"
+                        >
+                            Add New Tyre
+                        </Link>
+                    </div>
                 </div>
 
                 {message && (
