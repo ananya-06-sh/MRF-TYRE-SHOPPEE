@@ -12,6 +12,7 @@ import staffAccountRouter from "./routes/staffAccount.routes.js";
 import stockRouter from "./routes/stock.routes.js";
 import orderHistoryRouter from "./routes/orderHistory.routes.js";
 import inventoryImportRouter from "./routes/inventoryImport.routes.js";
+import tallyExportRouter from "./routes/tallyExport.routes.js";
 
 export const app = express();
 
@@ -52,6 +53,11 @@ app.use(
     "/api/v1/inventory-import",
     inventoryImportRouter
 );
+app.use(
+    "/api/v1/tally-export",
+    tallyExportRouter
+);
+
 app.get(
     "/api/v1/health",
     async (_request, response) => {

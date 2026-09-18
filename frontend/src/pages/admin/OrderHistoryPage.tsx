@@ -4,6 +4,7 @@ import {
     type FormEvent
 } from "react";
 import { Link } from "react-router-dom";
+import TallyExportButton from "../../components/common/TallyExportButton";
 import {
     getOrderHistory,
     getOrderHistoryById
@@ -28,7 +29,9 @@ function formatDate(value: string): string {
     }).format(new Date(value));
 }
 
-function getStatusClasses(status: OrderStatus): string {
+function getStatusClasses(
+    status: OrderStatus
+): string {
     switch (status) {
         case "TALLY_SYNCED":
             return "bg-blue-100 text-blue-700";
@@ -41,7 +44,9 @@ function getStatusClasses(status: OrderStatus): string {
     }
 }
 
-function getStatusLabel(status: OrderStatus): string {
+function getStatusLabel(
+    status: OrderStatus
+): string {
     return status.replaceAll("_", " ");
 }
 
@@ -59,8 +64,10 @@ export default function OrderHistoryPage() {
     const [isLoading, setIsLoading] =
         useState(true);
 
-    const [isLoadingDetails, setIsLoadingDetails] =
-        useState(false);
+    const [
+        isLoadingDetails,
+        setIsLoadingDetails
+    ] = useState(false);
 
     const [errorMessage, setErrorMessage] =
         useState<string | null>(null);
@@ -110,12 +117,14 @@ export default function OrderHistoryPage() {
     ) {
         event.preventDefault();
         setSelectedOrder(null);
+
         void loadOrders(searchText);
     }
 
     function clearSearch() {
         setSearchText("");
         setSelectedOrder(null);
+
         void loadOrders("");
     }
 
@@ -153,7 +162,9 @@ export default function OrderHistoryPage() {
                         type="search"
                         value={searchText}
                         onChange={(event) =>
-                            setSearchText(event.target.value)
+                            setSearchText(
+                                event.target.value
+                            )
                         }
                         placeholder="Bill number, customer, mobile or vehicle..."
                         className="min-w-0 flex-1 rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
@@ -206,7 +217,8 @@ export default function OrderHistoryPage() {
                                 </h3>
 
                                 <p className="mt-2 text-sm text-slate-500">
-                                    Confirm a bill or try another search.
+                                    Confirm a bill or try another
+                                    search.
                                 </p>
                             </div>
                         ) : (
@@ -215,9 +227,11 @@ export default function OrderHistoryPage() {
                                     <button
                                         key={order.id}
                                         type="button"
-                                        onClick={() =>
-                                            void openOrder(order.id)
-                                        }
+                                        onClick={() => {
+                                            void openOrder(
+                                                order.id
+                                            );
+                                        }}
                                         className={`w-full rounded-2xl bg-white p-4 text-left shadow-sm transition hover:shadow-md ${
                                             selectedOrder?.id ===
                                             order.id
@@ -228,7 +242,9 @@ export default function OrderHistoryPage() {
                                         <div className="flex items-start justify-between gap-3">
                                             <div>
                                                 <p className="font-bold text-slate-900">
-                                                    {order.billNumber}
+                                                    {
+                                                        order.billNumber
+                                                    }
                                                 </p>
 
                                                 <p className="mt-1 text-sm text-slate-500">
@@ -264,7 +280,8 @@ export default function OrderHistoryPage() {
                                                 <p className="mt-1 text-xs text-slate-400">
                                                     Created by{" "}
                                                     {
-                                                        order.createdBy
+                                                        order
+                                                            .createdBy
                                                             .displayName
                                                     }
                                                 </p>
@@ -296,7 +313,9 @@ export default function OrderHistoryPage() {
                                 Select a bill to view its details.
                             </div>
                         ) : (
-                            <BillDetails order={selectedOrder} />
+                            <BillDetails
+                                order={selectedOrder}
+                            />
                         )}
                     </section>
                 </div>
@@ -309,7 +328,9 @@ interface BillDetailsProps {
     order: OrderHistoryDetail;
 }
 
-function BillDetails({ order }: BillDetailsProps) {
+function BillDetails({
+                         order
+                     }: BillDetailsProps) {
     return (
         <article className="space-y-5 rounded-2xl bg-white p-5 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4">
@@ -376,7 +397,9 @@ function BillDetails({ order }: BillDetailsProps) {
 
                     <Detail
                         label="Created by"
-                        value={order.createdBy.displayName}
+                        value={
+                            order.createdBy.displayName
+                        }
                     />
                 </div>
             </section>
@@ -401,7 +424,9 @@ function BillDetails({ order }: BillDetailsProps) {
                                     </p>
 
                                     <p className="text-xs text-slate-500">
-                                        {item.productIdSnapshot}
+                                        {
+                                            item.productIdSnapshot
+                                        }
                                     </p>
 
                                     <p className="mt-1 text-sm text-slate-600">
@@ -430,31 +455,35 @@ function BillDetails({ order }: BillDetailsProps) {
                     </h4>
 
                     <div className="mt-3 space-y-3">
-                        {order.services.map((service) => (
-                            <div
-                                key={service.id}
-                                className="flex justify-between gap-4 rounded-xl border border-blue-200 bg-blue-50 p-3"
-                            >
-                                <div>
-                                    <p className="font-semibold text-slate-900">
-                                        {
-                                            service.serviceNameSnapshot
-                                        }
-                                    </p>
+                        {order.services.map(
+                            (service) => (
+                                <div
+                                    key={service.id}
+                                    className="flex justify-between gap-4 rounded-xl border border-blue-200 bg-blue-50 p-3"
+                                >
+                                    <div>
+                                        <p className="font-semibold text-slate-900">
+                                            {
+                                                service.serviceNameSnapshot
+                                            }
+                                        </p>
 
-                                    <p className="text-sm text-slate-600">
-                                        Quantity:{" "}
-                                        {service.quantity}
+                                        <p className="text-sm text-slate-600">
+                                            Quantity:{" "}
+                                            {
+                                                service.quantity
+                                            }
+                                        </p>
+                                    </div>
+
+                                    <p className="font-bold text-slate-900">
+                                        {formatPaise(
+                                            service.lineTotalPaise
+                                        )}
                                     </p>
                                 </div>
-
-                                <p className="font-bold text-slate-900">
-                                    {formatPaise(
-                                        service.lineTotalPaise
-                                    )}
-                                </p>
-                            </div>
-                        ))}
+                            )
+                        )}
                     </div>
                 </section>
             )}
@@ -466,12 +495,14 @@ function BillDetails({ order }: BillDetailsProps) {
                     </h4>
 
                     <p className="mt-2 text-sm text-violet-800">
-                        Job: {order.serviceJob.jobNumber}
+                        Job:{" "}
+                        {order.serviceJob.jobNumber}
                     </p>
 
                     <p className="text-sm text-violet-800">
                         Technician:{" "}
-                        {order.serviceJob.assignedTechnician ??
+                        {order.serviceJob
+                                .assignedTechnician ??
                             "Not assigned"}
                     </p>
 
@@ -513,10 +544,17 @@ function BillDetails({ order }: BillDetailsProps) {
                     <span>Total</span>
 
                     <span>
-                        {formatPaise(order.grandTotalPaise)}
+                        {formatPaise(
+                            order.grandTotalPaise
+                        )}
                     </span>
                 </div>
             </section>
+
+            <TallyExportButton
+                orderId={order.id}
+                billNumber={order.billNumber}
+            />
         </article>
     );
 }
@@ -526,7 +564,10 @@ interface DetailProps {
     value: string;
 }
 
-function Detail({ label, value }: DetailProps) {
+function Detail({
+                    label,
+                    value
+                }: DetailProps) {
     return (
         <div>
             <p className="text-xs font-semibold uppercase text-slate-400">

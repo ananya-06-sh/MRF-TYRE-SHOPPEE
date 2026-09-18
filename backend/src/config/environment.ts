@@ -23,10 +23,39 @@ const environmentSchema = z.object({
 
     JWT_SECRET: z
         .string()
-        .min(64, "JWT_SECRET must contain at least 64 characters")
+        .min(
+            64,
+            "JWT_SECRET must contain at least 64 characters"
+        ),
+
+    TALLY_COMPANY_NAME: z
+        .string()
+        .trim()
+        .min(1)
+        .default("MRF TYRE SHOP"),
+
+    TALLY_SALES_LEDGER_NAME: z
+        .string()
+        .trim()
+        .min(1)
+        .default("Sales"),
+
+    TALLY_CASH_LEDGER_NAME: z
+        .string()
+        .trim()
+        .min(1)
+        .default("Cash"),
+
+    TALLY_SERVICE_LEDGER_NAME: z
+        .string()
+        .trim()
+        .min(1)
+        .default("Tyre Services")
 });
 
-const result = environmentSchema.safeParse(process.env);
+const result = environmentSchema.safeParse(
+    process.env
+);
 
 if (!result.success) {
     console.error(
@@ -34,7 +63,9 @@ if (!result.success) {
         result.error.flatten().fieldErrors
     );
 
-    throw new Error("Invalid environment configuration");
+    throw new Error(
+        "Invalid environment configuration"
+    );
 }
 
 export const environment = result.data;
