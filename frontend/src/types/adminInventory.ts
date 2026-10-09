@@ -65,3 +65,28 @@ export interface StockInInput {
     newBaseCostRupees?: number;
     newSellingPriceRupees?: number;
 }
+
+export interface StockMovement {
+    id: string;
+    type:
+        | "OPENING_STOCK"
+        | "STOCK_IN"
+        | "SALE"
+        | "CUSTOMER_RETURN"
+        | "SUPPLIER_RETURN"
+        | "ADJUSTMENT";
+    quantityChange: number;
+    stockBefore: number;
+    stockAfter: number;
+    supplierName: string | null;
+    referenceNumber: string | null;
+    note: string | null;
+    occurredAt: string;
+    inventoryItem: {
+        productId: string;
+        patternAndSize: string;
+    };
+    performedBy: {
+        displayName: string;
+    };
+}

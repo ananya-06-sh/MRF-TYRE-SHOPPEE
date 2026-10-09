@@ -18,7 +18,7 @@ interface FailedImportResponse {
 }
 
 const INVENTORY_IMPORT_URL =
-    "http://localhost:3000/api/v1/inventory-import/csv";
+    "/api/v1/inventory-import/csv";
 
 export class InventoryImportApiError extends Error {
     constructor(

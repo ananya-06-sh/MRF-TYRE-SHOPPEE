@@ -52,7 +52,89 @@ const stockInSchema = z.object({
         .optional()
 });
 
+const stockAdjustmentSchema = z.object({
+    inventoryItemId: z.string().uuid("Select a valid tyre"),
+    newStock: z.number().int().min(0).max(100000),
+    reason: z.string().trim().min(3, "Enter a reason").max(500)
+});
+
 export class StockController {
+    async listMovements(
+        request: Request,
+        response: Response
+    ): Promise<void> {
+        const parsedLimit = Number(request.query.limit ?? 100);
+
+        try {
+            const movements =
+                await stockService.listMovements(
+                    Number.isFinite(parsedLimit)
+                        ? parsedLimit
+                        : 100
+                );
+
+            response.status(200).json({
+                success: true,
+                movements
+            });
+        } catch (error: unknown) {
+            console.error("Unable to load stock history:", error);
+            response.status(500).json({
+                success: false,
+                message: "Unable to load stock history"
+            });
+        }
+    }
+
+    async adjustStock(
+        request: Request,
+        response: Response
+    ): Promise<void> {
+        const validation =
+            stockAdjustmentSchema.safeParse(request.body);
+
+        if (!validation.success) {
+            response.status(400).json({
+                success: false,
+                message:
+                    validation.error.issues[0]?.message ??
+                    "Invalid stock adjustment"
+            });
+            return;
+        }
+
+        const authenticatedRequest =
+            request as AuthenticatedRequest;
+
+        try {
+            const inventoryItem =
+                await stockService.adjustStock(
+                    authenticatedRequest.authenticatedUser.id,
+                    validation.data
+                );
+
+            if (!inventoryItem) {
+                response.status(404).json({
+                    success: false,
+                    message: "Tyre was not found"
+                });
+                return;
+            }
+
+            response.status(200).json({
+                success: true,
+                message: "Stock corrected successfully",
+                inventoryItem
+            });
+        } catch (error: unknown) {
+            console.error("Stock adjustment failed:", error);
+            response.status(500).json({
+                success: false,
+                message: "Unable to correct stock"
+            });
+        }
+    }
+
     async stockIn(
         request: Request,
         response: Response

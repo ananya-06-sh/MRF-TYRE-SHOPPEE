@@ -4,7 +4,7 @@ import type {
 } from "../types/billing";
 
 const ORDER_API_URL =
-    "http://localhost:3000/api/v1/orders";
+    "/api/v1/orders";
 
 interface ApiErrorResponse {
     success: false;

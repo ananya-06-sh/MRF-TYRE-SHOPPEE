@@ -9,27 +9,41 @@ export interface CartState {
     items: CartItem[];
 }
 
-export function calculateCartItemTotal(item: CartItem): number {
-    return item.tyre.finalSellingPrice * item.quantity;
+export function calculateCartItemTotal(
+    item: CartItem
+): number {
+    return (
+        item.tyre.finalSellingPrice *
+        item.quantity
+    );
 }
 
-export function calculateCartTotal(items: CartItem[]): number {
+export function calculateCartTotal(
+    items: CartItem[]
+): number {
     return items.reduce(
-        (total, item) => total + calculateCartItemTotal(item),
+        (total, item) =>
+            total +
+            calculateCartItemTotal(item),
         0
     );
 }
 
-export function calculateCartQuantity(items: CartItem[]): number {
+export function calculateCartQuantity(
+    items: CartItem[]
+): number {
     return items.reduce(
-        (total, item) => total + item.quantity,
+        (total, item) =>
+            total + item.quantity,
         0
     );
 }
+
 export type ServiceType =
     | "ALIGNMENT"
     | "BALANCING"
-    | "BOTH";
+    | "BOTH"
+    | "OTHER";
 
 export interface ShopService {
     serviceId: string;
@@ -38,6 +52,7 @@ export interface ShopService {
     description: string;
     sellingPrice: number;
     gstRatePercent: number;
+    createsServiceJob?: boolean;
 }
 
 export interface SelectedService {

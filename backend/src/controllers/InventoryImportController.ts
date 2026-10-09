@@ -11,29 +11,60 @@ import {
 const inventoryImportService =
     new InventoryImportService();
 
+type SupportedFileType =
+    | "CSV"
+    | "EXCEL";
+
+function getFileType(
+    fileName: string
+): SupportedFileType | null {
+    const normalizedName =
+        fileName.trim().toLowerCase();
+
+    if (
+        normalizedName.endsWith(
+            ".csv"
+        )
+    ) {
+        return "CSV";
+    }
+
+    if (
+        normalizedName.endsWith(
+            ".xlsx"
+        )
+    ) {
+        return "EXCEL";
+    }
+
+    return null;
+}
+
 export class InventoryImportController {
-    async importCsv(
+    async importInventory(
         request: Request,
         response: Response
     ): Promise<void> {
         if (!request.file) {
             response.status(400).json({
                 success: false,
-                message: "Select a CSV inventory file"
+                message:
+                    "Select a CSV or Excel inventory file"
             });
 
             return;
         }
 
-        if (
-            !request.file.originalname
-                .toLowerCase()
-                .endsWith(".csv")
-        ) {
+        const fileType =
+            getFileType(
+                request.file.originalname
+            );
+
+        if (!fileType) {
             response.status(400).json({
                 success: false,
                 message:
-                    "Only CSV inventory files are supported"
+                    "Only .csv and .xlsx inventory files are supported"
             });
 
             return;
@@ -44,15 +75,36 @@ export class InventoryImportController {
 
         try {
             const result =
-                await inventoryImportService.importCsv(
-                    request.file.buffer,
-                    authenticatedRequest
-                        .authenticatedUser.id
-                );
+                fileType === "CSV"
+                    ? await inventoryImportService
+                        .importCsv(
+                            request.file
+                                .buffer,
+
+                            authenticatedRequest
+                                .authenticatedUser
+                                .id
+                        )
+                    : await inventoryImportService
+                        .importExcel(
+                            request.file
+                                .buffer,
+
+                            authenticatedRequest
+                                .authenticatedUser
+                                .id
+                        );
 
             response.status(200).json({
                 success: true,
-                message: "Inventory imported successfully",
+
+                message:
+                    fileType === "CSV"
+                        ? "CSV inventory imported successfully"
+                        : "Excel inventory imported successfully",
+
+                fileType,
+
                 result
             });
         } catch (error: unknown) {
@@ -71,14 +123,25 @@ export class InventoryImportController {
             }
 
             console.error(
-                "Inventory CSV import failed:",
+                "Inventory import failed:",
                 error
             );
 
             response.status(500).json({
                 success: false,
-                message: "Unable to import inventory"
+                message:
+                    "Unable to import inventory"
             });
         }
+    }
+
+    async importCsv(
+        request: Request,
+        response: Response
+    ): Promise<void> {
+        await this.importInventory(
+            request,
+            response
+        );
     }
 }

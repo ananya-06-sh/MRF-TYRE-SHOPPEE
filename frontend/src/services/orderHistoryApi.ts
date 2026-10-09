@@ -4,7 +4,7 @@ import type {
 } from "../types/orderHistory";
 
 const ORDER_HISTORY_API_URL =
-    "http://localhost:3000/api/v1/order-history";
+    "/api/v1/order-history";
 
 interface ApiErrorResponse {
     success: false;
@@ -19,6 +19,11 @@ interface OrderHistoryListResponse {
 interface OrderHistoryDetailResponse {
     success: true;
     order: OrderHistoryDetail;
+}
+
+interface MessageResponse {
+    success: true;
+    message: string;
 }
 
 async function parseResponse<T>(
@@ -89,4 +94,23 @@ export async function getOrderHistoryById(
         );
 
     return data.order;
+}
+
+export async function cancelOrder(
+    orderId: string
+): Promise<string> {
+    const response = await fetch(
+        `${ORDER_HISTORY_API_URL}/${orderId}/cancel`,
+        {
+            method: "PATCH",
+            credentials: "include"
+        }
+    );
+
+    const data =
+        await parseResponse<MessageResponse>(
+            response
+        );
+
+    return data.message;
 }

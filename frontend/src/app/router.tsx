@@ -9,18 +9,21 @@ import ProtectedRoute from "../components/auth/ProtectedRoute";
 import AccountSettingsPage from "../pages/account/AccountSettingsPage";
 import AdminInventoryPage from "../pages/admin/AdminInventoryPage";
 import InventoryFormPage from "../pages/admin/InventoryFormPage";
+import InventoryImportPage from "../pages/admin/InventoryImportPage";
+import StockControlPage from "../pages/admin/StockControlPage";
 import OrderHistoryPage from "../pages/admin/OrderHistoryPage";
 import QuickStockInPage from "../pages/admin/QuickStockInPage";
+import ServiceCataloguePage from "../pages/admin/ServiceCataloguePage";
 import StaffAccountsPage from "../pages/admin/StaffAccountsPage";
 import LoginPage from "../pages/auth/LoginPage";
 import BillingPage from "../pages/billing/BillingPage";
+import PrintableInvoicePage from "../pages/billing/PrintableInvoicePage";
 import CartPage from "../pages/cart/CartPage";
 import ServiceSelectionPage from "../pages/cart/ServiceSelectionPage";
 import AdminDashboardPage from "../pages/dashboard/AdminDashboardPage";
 import StaffDashboardPage from "../pages/dashboard/StaffDashboardPage";
 import ServiceJobsPage from "../pages/services/ServiceJobsPage";
 import StaffStockInPage from "../pages/stock/StaffStockInPage";
-import InventoryImportPage from "../pages/admin/InventoryImportPage";
 
 export default function AppRouter() {
     return (
@@ -35,7 +38,10 @@ export default function AppRouter() {
                     path="/"
                     element={
                         <ProtectedRoute
-                            allowedRoles={["ADMIN", "STAFF"]}
+                            allowedRoles={[
+                                "ADMIN",
+                                "STAFF"
+                            ]}
                         >
                             <StaffDashboardPage />
                         </ProtectedRoute>
@@ -46,7 +52,9 @@ export default function AppRouter() {
                     path="/admin"
                     element={
                         <ProtectedRoute
-                            allowedRoles={["ADMIN"]}
+                            allowedRoles={[
+                                "ADMIN"
+                            ]}
                         >
                             <AdminDashboardPage />
                         </ProtectedRoute>
@@ -57,7 +65,9 @@ export default function AppRouter() {
                     path="/admin/inventory"
                     element={
                         <ProtectedRoute
-                            allowedRoles={["ADMIN"]}
+                            allowedRoles={[
+                                "ADMIN"
+                            ]}
                         >
                             <AdminInventoryPage />
                         </ProtectedRoute>
@@ -68,7 +78,9 @@ export default function AppRouter() {
                     path="/admin/inventory/new"
                     element={
                         <ProtectedRoute
-                            allowedRoles={["ADMIN"]}
+                            allowedRoles={[
+                                "ADMIN"
+                            ]}
                         >
                             <InventoryFormPage />
                         </ProtectedRoute>
@@ -79,17 +91,22 @@ export default function AppRouter() {
                     path="/admin/inventory/import"
                     element={
                         <ProtectedRoute
-                            allowedRoles={["ADMIN"]}
+                            allowedRoles={[
+                                "ADMIN"
+                            ]}
                         >
                             <InventoryImportPage />
                         </ProtectedRoute>
                     }
                 />
+
                 <Route
                     path="/admin/inventory/:inventoryItemId/edit"
                     element={
                         <ProtectedRoute
-                            allowedRoles={["ADMIN"]}
+                            allowedRoles={[
+                                "ADMIN"
+                            ]}
                         >
                             <InventoryFormPage />
                         </ProtectedRoute>
@@ -100,9 +117,20 @@ export default function AppRouter() {
                     path="/admin/stock-in"
                     element={
                         <ProtectedRoute
-                            allowedRoles={["ADMIN"]}
+                            allowedRoles={[
+                                "ADMIN"
+                            ]}
                         >
                             <QuickStockInPage />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/admin/stock-control"
+                    element={
+                        <ProtectedRoute allowedRoles={["ADMIN"]}>
+                            <StockControlPage />
                         </ProtectedRoute>
                     }
                 />
@@ -111,7 +139,10 @@ export default function AppRouter() {
                     path="/stock-in"
                     element={
                         <ProtectedRoute
-                            allowedRoles={["ADMIN", "STAFF"]}
+                            allowedRoles={[
+                                "ADMIN",
+                                "STAFF"
+                            ]}
                             requireStockInPermission
                         >
                             <StaffStockInPage />
@@ -123,7 +154,9 @@ export default function AppRouter() {
                     path="/admin/staff"
                     element={
                         <ProtectedRoute
-                            allowedRoles={["ADMIN"]}
+                            allowedRoles={[
+                                "ADMIN"
+                            ]}
                         >
                             <StaffAccountsPage />
                         </ProtectedRoute>
@@ -134,9 +167,38 @@ export default function AppRouter() {
                     path="/admin/orders"
                     element={
                         <ProtectedRoute
-                            allowedRoles={["ADMIN"]}
+                            allowedRoles={[
+                                "ADMIN"
+                            ]}
                         >
                             <OrderHistoryPage />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/admin/orders/:orderId/print"
+                    element={
+                        <ProtectedRoute
+                            allowedRoles={[
+                                "ADMIN",
+                                "STAFF"
+                            ]}
+                        >
+                            <PrintableInvoicePage />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/admin/services"
+                    element={
+                        <ProtectedRoute
+                            allowedRoles={[
+                                "ADMIN"
+                            ]}
+                        >
+                            <ServiceCataloguePage />
                         </ProtectedRoute>
                     }
                 />
@@ -145,7 +207,10 @@ export default function AppRouter() {
                     path="/account"
                     element={
                         <ProtectedRoute
-                            allowedRoles={["ADMIN", "STAFF"]}
+                            allowedRoles={[
+                                "ADMIN",
+                                "STAFF"
+                            ]}
                         >
                             <AccountSettingsPage />
                         </ProtectedRoute>
@@ -156,7 +221,10 @@ export default function AppRouter() {
                     path="/cart"
                     element={
                         <ProtectedRoute
-                            allowedRoles={["ADMIN", "STAFF"]}
+                            allowedRoles={[
+                                "ADMIN",
+                                "STAFF"
+                            ]}
                         >
                             <CartPage />
                         </ProtectedRoute>
@@ -167,7 +235,10 @@ export default function AppRouter() {
                     path="/cart/services"
                     element={
                         <ProtectedRoute
-                            allowedRoles={["ADMIN", "STAFF"]}
+                            allowedRoles={[
+                                "ADMIN",
+                                "STAFF"
+                            ]}
                         >
                             <ServiceSelectionPage />
                         </ProtectedRoute>
@@ -178,7 +249,10 @@ export default function AppRouter() {
                     path="/billing"
                     element={
                         <ProtectedRoute
-                            allowedRoles={["ADMIN", "STAFF"]}
+                            allowedRoles={[
+                                "ADMIN",
+                                "STAFF"
+                            ]}
                         >
                             <BillingPage />
                         </ProtectedRoute>
@@ -189,7 +263,10 @@ export default function AppRouter() {
                     path="/services"
                     element={
                         <ProtectedRoute
-                            allowedRoles={["ADMIN", "STAFF"]}
+                            allowedRoles={[
+                                "ADMIN",
+                                "STAFF"
+                            ]}
                         >
                             <ServiceJobsPage />
                         </ProtectedRoute>
@@ -198,7 +275,12 @@ export default function AppRouter() {
 
                 <Route
                     path="*"
-                    element={<Navigate to="/" replace />}
+                    element={
+                        <Navigate
+                            to="/"
+                            replace
+                        />
+                    }
                 />
             </Routes>
         </BrowserRouter>

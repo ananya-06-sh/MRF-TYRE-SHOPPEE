@@ -14,7 +14,7 @@ import {
 export default function BillingPage() {
     const {
         items,
-        selectedService,
+        selectedServices,
         clearCart
     } = useCart();
 
@@ -38,7 +38,9 @@ export default function BillingPage() {
     const [
         confirmedOrder,
         setConfirmedOrder
-    ] = useState<ConfirmedOrder | null>(null);
+    ] = useState<ConfirmedOrder | null>(
+        null
+    );
 
     const [isConfirming, setIsConfirming] =
         useState(false);
@@ -47,164 +49,261 @@ export default function BillingPage() {
         useState<string | null>(null);
 
     const [billingPrices, setBillingPrices] =
-        useState<Record<string, number>>(() => {
-            const initialPrices:
-                Record<string, number> = {};
+        useState<Record<string, number>>(
+            () => {
+                const initialPrices:
+                    Record<string, number> =
+                    {};
 
-            items.forEach((item) => {
-                initialPrices[item.tyre.productId] =
-                    item.tyre.finalSellingPrice;
-            });
+                items.forEach((item) => {
+                    initialPrices[
+                        item.tyre.productId
+                        ] =
+                        item.tyre
+                            .finalSellingPrice;
+                });
 
-            if (selectedService) {
-                initialPrices[
-                    selectedService.service.serviceId
-                    ] =
-                    selectedService.service.sellingPrice;
+                selectedServices.forEach(
+                    (selectedService) => {
+                        initialPrices[
+                            selectedService
+                                .service
+                                .serviceId
+                            ] =
+                            selectedService
+                                .service
+                                .sellingPrice;
+                    }
+                );
+
+                return initialPrices;
             }
-
-            return initialPrices;
-        });
+        );
 
     function updateBillingPrice(
         lineId: string,
         newPrice: number
     ): void {
-        setBillingPrices((currentPrices) => ({
-            ...currentPrices,
-            [lineId]: Math.max(0, newPrice)
-        }));
+        setBillingPrices(
+            (currentPrices) => ({
+                ...currentPrices,
+
+                [lineId]: Math.max(
+                    0,
+                    Number.isFinite(newPrice)
+                        ? newPrice
+                        : 0
+                )
+            })
+        );
     }
 
-    const tyreLines = items.map((item) => {
-        const unitPrice =
-            billingPrices[item.tyre.productId] ??
-            item.tyre.finalSellingPrice;
-
-        const lineTotal =
-            unitPrice * item.quantity;
-
-        const tax = calculateIncludedTax(
-            lineTotal,
-            item.tyre.gstRatePercent
-        );
-
-        return {
-            item,
-            unitPrice,
-            lineTotal,
-            tax
-        };
-    });
-
-    const serviceLine = selectedService
-        ? (() => {
+    const tyreLines = items.map(
+        (item) => {
             const unitPrice =
                 billingPrices[
-                    selectedService.service.serviceId
+                    item.tyre.productId
                     ] ??
-                selectedService.service.sellingPrice;
+                item.tyre.finalSellingPrice;
 
             const lineTotal =
                 unitPrice *
-                selectedService.quantity;
+                item.quantity;
 
-            const tax = calculateIncludedTax(
-                lineTotal,
-                selectedService.service
-                    .gstRatePercent
-            );
+            const tax =
+                calculateIncludedTax(
+                    lineTotal,
+                    item.tyre
+                        .gstRatePercent
+                );
 
             return {
-                selectedService,
+                item,
                 unitPrice,
                 lineTotal,
                 tax
             };
-        })()
-        : null;
-
-    const productsTotal = tyreLines.reduce(
-        (total, line) =>
-            total + line.lineTotal,
-        0
+        }
     );
 
+    const serviceLines =
+        selectedServices.map(
+            (selectedService) => {
+                const service =
+                    selectedService.service;
+
+                const unitPrice =
+                    billingPrices[
+                        service.serviceId
+                        ] ??
+                    service.sellingPrice;
+
+                const lineTotal =
+                    unitPrice *
+                    selectedService.quantity;
+
+                const tax =
+                    calculateIncludedTax(
+                        lineTotal,
+                        service.gstRatePercent
+                    );
+
+                return {
+                    selectedService,
+                    unitPrice,
+                    lineTotal,
+                    tax
+                };
+            }
+        );
+
+    const productsTotal =
+        tyreLines.reduce(
+            (total, line) =>
+                total +
+                line.lineTotal,
+            0
+        );
+
     const serviceTotal =
-        serviceLine?.lineTotal ?? 0;
+        serviceLines.reduce(
+            (total, line) =>
+                total +
+                line.lineTotal,
+            0
+        );
 
     const includedTaxTotal =
         tyreLines.reduce(
             (total, line) =>
-                total + line.tax.taxAmount,
+                total +
+                line.tax.taxAmount,
             0
         ) +
-        (serviceLine?.tax.taxAmount ?? 0);
+        serviceLines.reduce(
+            (total, line) =>
+                total +
+                line.tax.taxAmount,
+            0
+        );
 
     const grandTotal =
-        productsTotal + serviceTotal;
+        productsTotal +
+        serviceTotal;
+
+    const hasProducts =
+        items.length > 0;
+
+    const hasServices =
+        selectedServices.length > 0;
+
+    const requiresVehicleDetails =
+        selectedServices.some(
+            (selectedService) =>
+                selectedService.service
+                    .createsServiceJob !==
+                false
+        );
 
     async function handleConfirmBill(
         event: FormEvent<HTMLFormElement>
     ): Promise<void> {
         event.preventDefault();
+
+        if (
+            !hasProducts &&
+            !hasServices
+        ) {
+            setError(
+                "Add at least one tyre or service."
+            );
+
+            return;
+        }
+
         setError(null);
         setIsConfirming(true);
 
         try {
-            const order = await confirmBill({
-                idempotencyKey,
-                customerName:
-                    customerName.trim() || undefined,
-                customerMobile:
-                    customerMobile.trim() || undefined,
-                vehiclePlateNumber:
-                    vehiclePlateNumber.trim() ||
-                    undefined,
-                vehicleModel:
-                    vehicleModel.trim() || undefined,
-                products: tyreLines.map(
-                    ({ item, unitPrice }) => ({
-                        productId:
-                        item.tyre.productId,
-                        quantity: item.quantity,
-                        billedUnitPriceRupees:
-                        unitPrice
-                    })
-                ),
-                service: serviceLine
-                    ? {
-                        serviceId:
-                        serviceLine
-                            .selectedService
-                            .service.serviceId,
-                        serviceType:
-                        serviceLine
-                            .selectedService
-                            .service.serviceType,
-                        serviceName:
-                        serviceLine
-                            .selectedService
-                            .service.name,
-                        quantity:
-                        serviceLine
-                            .selectedService
-                            .quantity,
-                        standardUnitPriceRupees:
-                        serviceLine
-                            .selectedService
-                            .service
-                            .sellingPrice,
-                        billedUnitPriceRupees:
-                        serviceLine.unitPrice,
-                        gstRatePercent:
-                        serviceLine
-                            .selectedService
-                            .service
-                            .gstRatePercent
-                    }
-                    : undefined
-            });
+            const order =
+                await confirmBill({
+                    idempotencyKey,
+
+                    customerName:
+                        customerName.trim() ||
+                        undefined,
+
+                    customerMobile:
+                        customerMobile.trim() ||
+                        undefined,
+
+                    vehiclePlateNumber:
+                        vehiclePlateNumber
+                            .trim() ||
+                        undefined,
+
+                    vehicleModel:
+                        vehicleModel.trim() ||
+                        undefined,
+
+                    products:
+                        tyreLines.map(
+                            ({
+                                 item,
+                                 unitPrice
+                             }) => ({
+                                productId:
+                                item.tyre
+                                    .productId,
+
+                                quantity:
+                                item.quantity,
+
+                                billedUnitPriceRupees:
+                                unitPrice
+                            })
+                        ),
+
+                    services:
+                        serviceLines.map(
+                            ({
+                                 selectedService,
+                                 unitPrice
+                             }) => ({
+                                serviceId:
+                                selectedService
+                                    .service
+                                    .serviceId,
+
+                                serviceType:
+                                selectedService
+                                    .service
+                                    .serviceType,
+
+                                serviceName:
+                                selectedService
+                                    .service
+                                    .name,
+
+                                quantity:
+                                selectedService
+                                    .quantity,
+
+                                standardUnitPriceRupees:
+                                selectedService
+                                    .service
+                                    .sellingPrice,
+
+                                billedUnitPriceRupees:
+                                unitPrice,
+
+                                gstRatePercent:
+                                selectedService
+                                    .service
+                                    .gstRatePercent
+                            })
+                        )
+                });
 
             setConfirmedOrder(order);
             clearCart();
@@ -232,7 +331,8 @@ export default function BillingPage() {
                     </h1>
 
                     <p className="mt-2 text-sm text-slate-500">
-                        Stock has been updated successfully.
+                        The bill was saved and tyre
+                        stock was updated.
                     </p>
 
                     <div className="mt-5 rounded-xl bg-slate-100 p-4">
@@ -241,7 +341,10 @@ export default function BillingPage() {
                         </p>
 
                         <p className="mt-1 font-bold text-slate-900">
-                            {confirmedOrder.billNumber}
+                            {
+                                confirmedOrder
+                                    .billNumber
+                            }
                         </p>
 
                         <p className="mt-4 text-xs font-semibold uppercase text-slate-500">
@@ -257,17 +360,16 @@ export default function BillingPage() {
                         </p>
                     </div>
 
-                    <button
-                        type="button"
-                        disabled
-                        className="mt-4 w-full cursor-not-allowed rounded-xl bg-slate-300 px-4 py-3 font-semibold text-slate-500"
+                    <Link
+                        to={`/admin/orders/${confirmedOrder.id}/print`}
+                        className="mt-4 block w-full rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white hover:bg-slate-800"
                     >
-                        Send to Tally — Coming Next
-                    </button>
+                        Print Customer Bill
+                    </Link>
 
                     <Link
                         to="/"
-                        className="mt-3 block w-full rounded-xl bg-red-600 px-4 py-3 font-semibold text-white"
+                        className="mt-3 block w-full rounded-xl bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-700"
                     >
                         Start New Bill
                     </Link>
@@ -276,20 +378,37 @@ export default function BillingPage() {
         );
     }
 
-    if (items.length === 0) {
+    if (
+        !hasProducts &&
+        !hasServices
+    ) {
         return (
             <main className="min-h-screen bg-slate-100 p-4">
                 <div className="mx-auto max-w-3xl rounded-2xl bg-white p-8 text-center">
-                    <h1 className="text-xl font-bold">
+                    <h1 className="text-xl font-bold text-slate-900">
                         Nothing to bill
                     </h1>
 
-                    <Link
-                        to="/"
-                        className="mt-5 inline-block rounded-xl bg-red-600 px-5 py-3 font-semibold text-white"
-                    >
-                        Find Tyres
-                    </Link>
+                    <p className="mt-2 text-sm text-slate-500">
+                        Add tyres or select a service
+                        before continuing.
+                    </p>
+
+                    <div className="mt-5 flex flex-wrap justify-center gap-3">
+                        <Link
+                            to="/"
+                            className="rounded-xl bg-slate-900 px-5 py-3 font-semibold text-white"
+                        >
+                            Find Tyres
+                        </Link>
+
+                        <Link
+                            to="/cart/services"
+                            className="rounded-xl bg-red-600 px-5 py-3 font-semibold text-white"
+                        >
+                            Select Services
+                        </Link>
+                    </div>
                 </div>
             </main>
         );
@@ -311,7 +430,8 @@ export default function BillingPage() {
                     </h1>
 
                     <p className="text-sm text-slate-500">
-                        Prices can only be edited on this page.
+                        Review products and services
+                        before confirming the bill.
                     </p>
                 </div>
             </header>
@@ -331,7 +451,8 @@ export default function BillingPage() {
                             value={customerName}
                             onChange={(event) =>
                                 setCustomerName(
-                                    event.target.value
+                                    event.target
+                                        .value
                                 )
                             }
                             placeholder="Customer name (optional)"
@@ -340,10 +461,13 @@ export default function BillingPage() {
 
                         <input
                             type="tel"
-                            value={customerMobile}
+                            value={
+                                customerMobile
+                            }
                             onChange={(event) =>
                                 setCustomerMobile(
-                                    event.target.value
+                                    event.target
+                                        .value
                                 )
                             }
                             placeholder="Mobile number (optional)"
@@ -352,19 +476,22 @@ export default function BillingPage() {
 
                         <input
                             type="text"
-                            value={vehiclePlateNumber}
+                            value={
+                                vehiclePlateNumber
+                            }
                             onChange={(event) =>
                                 setVehiclePlateNumber(
-                                    event.target.value
+                                    event.target
+                                        .value
                                 )
                             }
                             placeholder={
-                                selectedService
+                                requiresVehicleDetails
                                     ? "Vehicle plate number (required)"
-                                    : "Vehicle plate number"
+                                    : "Vehicle plate number (optional)"
                             }
                             required={
-                                selectedService !== null
+                                requiresVehicleDetails
                             }
                             className="rounded-xl border border-slate-300 px-4 py-3 uppercase outline-none focus:border-red-500"
                         />
@@ -374,207 +501,168 @@ export default function BillingPage() {
                             value={vehicleModel}
                             onChange={(event) =>
                                 setVehicleModel(
-                                    event.target.value
+                                    event.target
+                                        .value
                                 )
                             }
                             placeholder={
-                                selectedService
+                                requiresVehicleDetails
                                     ? "Vehicle model (required)"
-                                    : "Vehicle model"
+                                    : "Vehicle model (optional)"
                             }
                             required={
-                                selectedService !== null
+                                requiresVehicleDetails
                             }
                             className="rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-red-500"
                         />
                     </div>
                 </section>
 
-                <section className="space-y-3">
-                    <h2 className="font-bold text-slate-900">
-                        Products
-                    </h2>
-
-                    {tyreLines.map(
-                        ({
-                             item,
-                             unitPrice,
-                             lineTotal,
-                             tax
-                         }) => (
-                            <article
-                                key={
-                                    item.tyre.productId
-                                }
-                                className="rounded-2xl bg-white p-4"
-                            >
-                                <h3 className="font-bold text-slate-900">
-                                    {
-                                        item.tyre
-                                            .patternAndSize
-                                    }
-                                </h3>
-
-                                <p className="mt-1 text-sm text-slate-500">
-                                    Quantity:{" "}
-                                    {item.quantity}
-                                </p>
-
-                                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                                    <div>
-                                        <label className="text-xs font-semibold text-slate-500">
-                                            Standard unit price
-                                        </label>
-
-                                        <p className="mt-1 rounded-xl bg-slate-100 px-4 py-3 font-semibold">
-                                            {formatInr(
-                                                item.tyre
-                                                    .finalSellingPrice
-                                            )}
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <label className="text-xs font-semibold text-slate-500">
-                                            Billing unit price
-                                        </label>
-
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            value={unitPrice}
-                                            onChange={(event) =>
-                                                updateBillingPrice(
-                                                    item.tyre
-                                                        .productId,
-                                                    Number(
-                                                        event
-                                                            .target
-                                                            .value
-                                                    )
-                                                )
-                                            }
-                                            className="mt-1 w-full rounded-xl border border-red-300 px-4 py-3 font-bold outline-none focus:border-red-600"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="mt-4 border-t border-slate-100 pt-3 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-slate-500">
-                                            Included GST (
-                                            {
-                                                item.tyre
-                                                    .gstRatePercent
-                                            }
-                                            %)
-                                        </span>
-
-                                        <span>
-                                            {formatInr(
-                                                tax.taxAmount
-                                            )}
-                                        </span>
-                                    </div>
-
-                                    <div className="mt-2 flex justify-between font-bold">
-                                        <span>
-                                            Line total
-                                        </span>
-
-                                        <span>
-                                            {formatInr(
-                                                lineTotal
-                                            )}
-                                        </span>
-                                    </div>
-                                </div>
-                            </article>
-                        )
-                    )}
-                </section>
-
-                {serviceLine && (
-                    <section>
-                        <h2 className="mb-3 font-bold text-slate-900">
-                            Service
+                {hasProducts && (
+                    <section className="space-y-3">
+                        <h2 className="font-bold text-slate-900">
+                            Products
                         </h2>
 
-                        <article className="rounded-2xl bg-white p-4">
-                            <h3 className="font-bold text-slate-900">
-                                {
-                                    serviceLine
-                                        .selectedService
-                                        .service.name
-                                }
-                            </h3>
-
-                            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                                <div>
-                                    <label className="text-xs font-semibold text-slate-500">
-                                        Standard price
-                                    </label>
-
-                                    <p className="mt-1 rounded-xl bg-slate-100 px-4 py-3 font-semibold">
-                                        {formatInr(
-                                            serviceLine
-                                                .selectedService
-                                                .service
-                                                .sellingPrice
-                                        )}
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <label className="text-xs font-semibold text-slate-500">
-                                        Billing price
-                                    </label>
-
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        value={
-                                            serviceLine.unitPrice
+                        {tyreLines.map(
+                            ({
+                                 item,
+                                 unitPrice,
+                                 lineTotal,
+                                 tax
+                             }) => (
+                                <article
+                                    key={
+                                        item.tyre
+                                            .productId
+                                    }
+                                    className="rounded-2xl bg-white p-4"
+                                >
+                                    <h3 className="font-bold text-slate-900">
+                                        {
+                                            item.tyre
+                                                .patternAndSize
                                         }
-                                        onChange={(event) =>
+                                    </h3>
+
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        Quantity:{" "}
+                                        {
+                                            item.quantity
+                                        }
+                                    </p>
+
+                                    <PriceFields
+                                        standardPrice={
+                                            item.tyre
+                                                .finalSellingPrice
+                                        }
+                                        billingPrice={
+                                            unitPrice
+                                        }
+                                        onChange={(
+                                            value
+                                        ) =>
                                             updateBillingPrice(
-                                                serviceLine
-                                                    .selectedService
-                                                    .service
-                                                    .serviceId,
-                                                Number(
-                                                    event.target
-                                                        .value
-                                                )
+                                                item.tyre
+                                                    .productId,
+                                                value
                                             )
                                         }
-                                        className="mt-1 w-full rounded-xl border border-red-300 px-4 py-3 font-bold outline-none focus:border-red-600"
                                     />
-                                </div>
-                            </div>
 
-                            <div className="mt-4 flex justify-between border-t border-slate-100 pt-3 text-sm">
-                                <span className="text-slate-500">
-                                    Included GST (
-                                    {
-                                        serviceLine
-                                            .selectedService
+                                    <LineSummary
+                                        gstRate={
+                                            item.tyre
+                                                .gstRatePercent
+                                        }
+                                        taxAmount={
+                                            tax.taxAmount
+                                        }
+                                        lineTotal={
+                                            lineTotal
+                                        }
+                                    />
+                                </article>
+                            )
+                        )}
+                    </section>
+                )}
+
+                {hasServices && (
+                    <section className="space-y-3">
+                        <h2 className="font-bold text-slate-900">
+                            Services
+                        </h2>
+
+                        {serviceLines.map(
+                            ({
+                                 selectedService,
+                                 unitPrice,
+                                 lineTotal,
+                                 tax
+                             }) => (
+                                <article
+                                    key={
+                                        selectedService
                                             .service
-                                            .gstRatePercent
+                                            .serviceId
                                     }
-                                    %)
-                                </span>
+                                    className="rounded-2xl bg-white p-4"
+                                >
+                                    <h3 className="font-bold text-slate-900">
+                                        {
+                                            selectedService
+                                                .service
+                                                .name
+                                        }
+                                    </h3>
 
-                                <span>
-                                    {formatInr(
-                                        serviceLine.tax
-                                            .taxAmount
-                                    )}
-                                </span>
-                            </div>
-                        </article>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        Quantity:{" "}
+                                        {
+                                            selectedService
+                                                .quantity
+                                        }
+                                    </p>
+
+                                    <PriceFields
+                                        standardPrice={
+                                            selectedService
+                                                .service
+                                                .sellingPrice
+                                        }
+                                        billingPrice={
+                                            unitPrice
+                                        }
+                                        onChange={(
+                                            value
+                                        ) =>
+                                            updateBillingPrice(
+                                                selectedService
+                                                    .service
+                                                    .serviceId,
+                                                value
+                                            )
+                                        }
+                                    />
+
+                                    <LineSummary
+                                        gstRate={
+                                            selectedService
+                                                .service
+                                                .gstRatePercent
+                                        }
+                                        taxAmount={
+                                            tax.taxAmount
+                                        }
+                                        lineTotal={
+                                            lineTotal
+                                        }
+                                    />
+                                </article>
+                            )
+                        )}
                     </section>
                 )}
 
@@ -590,48 +678,37 @@ export default function BillingPage() {
                     </h2>
 
                     <div className="mt-4 space-y-2 text-sm">
-                        <div className="flex justify-between">
-                            <span className="text-slate-300">
-                                Products
-                            </span>
+                        <SummaryRow
+                            label="Products"
+                            amount={
+                                productsTotal
+                            }
+                        />
 
-                            <span>
-                                {formatInr(
-                                    productsTotal
-                                )}
-                            </span>
-                        </div>
+                        <SummaryRow
+                            label="Services"
+                            amount={
+                                serviceTotal
+                            }
+                        />
 
-                        <div className="flex justify-between">
-                            <span className="text-slate-300">
-                                Services
-                            </span>
-
-                            <span>
-                                {formatInr(
-                                    serviceTotal
-                                )}
-                            </span>
-                        </div>
-
-                        <div className="flex justify-between">
-                            <span className="text-slate-300">
-                                Included GST
-                            </span>
-
-                            <span>
-                                {formatInr(
-                                    includedTaxTotal
-                                )}
-                            </span>
-                        </div>
+                        <SummaryRow
+                            label="Included GST"
+                            amount={
+                                includedTaxTotal
+                            }
+                        />
                     </div>
 
                     <div className="mt-4 flex justify-between border-t border-slate-700 pt-4 text-xl font-bold">
-                        <span>Total Payable</span>
+                        <span>
+                            Total Payable
+                        </span>
 
                         <span>
-                            {formatInr(grandTotal)}
+                            {formatInr(
+                                grandTotal
+                            )}
                         </span>
                     </div>
 
@@ -642,10 +719,125 @@ export default function BillingPage() {
                     >
                         {isConfirming
                             ? "Confirming Bill..."
-                            : "Confirm Bill & Update Stock"}
+                            : hasProducts
+                                ? "Confirm Bill & Update Stock"
+                                : "Confirm Service Bill"}
                     </button>
                 </section>
             </form>
         </main>
+    );
+}
+
+interface PriceFieldsProps {
+    standardPrice: number;
+    billingPrice: number;
+    onChange: (
+        value: number
+    ) => void;
+}
+
+function PriceFields({
+                         standardPrice,
+                         billingPrice,
+                         onChange
+                     }: PriceFieldsProps) {
+    return (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div>
+                <label className="text-xs font-semibold text-slate-500">
+                    Standard unit price
+                </label>
+
+                <p className="mt-1 rounded-xl bg-slate-100 px-4 py-3 font-semibold">
+                    {formatInr(
+                        standardPrice
+                    )}
+                </p>
+            </div>
+
+            <div>
+                <label className="text-xs font-semibold text-slate-500">
+                    Billing unit price
+                </label>
+
+                <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={billingPrice}
+                    onChange={(event) =>
+                        onChange(
+                            Number(
+                                event.target
+                                    .value
+                            )
+                        )
+                    }
+                    className="mt-1 w-full rounded-xl border border-red-300 px-4 py-3 font-bold outline-none focus:border-red-600"
+                />
+            </div>
+        </div>
+    );
+}
+
+interface LineSummaryProps {
+    gstRate: number;
+    taxAmount: number;
+    lineTotal: number;
+}
+
+function LineSummary({
+                         gstRate,
+                         taxAmount,
+                         lineTotal
+                     }: LineSummaryProps) {
+    return (
+        <div className="mt-4 border-t border-slate-100 pt-3 text-sm">
+            <div className="flex justify-between">
+                <span className="text-slate-500">
+                    Included GST (
+                    {gstRate}%)
+                </span>
+
+                <span>
+                    {formatInr(
+                        taxAmount
+                    )}
+                </span>
+            </div>
+
+            <div className="mt-2 flex justify-between font-bold">
+                <span>Line total</span>
+
+                <span>
+                    {formatInr(
+                        lineTotal
+                    )}
+                </span>
+            </div>
+        </div>
+    );
+}
+
+interface SummaryRowProps {
+    label: string;
+    amount: number;
+}
+
+function SummaryRow({
+                        label,
+                        amount
+                    }: SummaryRowProps) {
+    return (
+        <div className="flex justify-between">
+            <span className="text-slate-300">
+                {label}
+            </span>
+
+            <span>
+                {formatInr(amount)}
+            </span>
+        </div>
     );
 }

@@ -12,7 +12,12 @@
     "dev": "concurrently --names BACKEND,FRONTEND --prefix-colors blue,magenta \"npm:dev:backend\" \"npm:dev:frontend\"",
     "dev:backend": "npm run dev --workspace=@mrf-shop/backend",
     "dev:frontend": "npm run dev --workspace=@mrf-shop/frontend",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "start": "npm run start --workspace=@mrf-shop/backend",
+    "db:generate": "npm run db:generate --workspace=@mrf-shop/backend",
+    "db:deploy": "npm run db:deploy --workspace=@mrf-shop/backend",
+    "db:studio": "npm run db:studio --workspace=@mrf-shop/backend",
+    "db:seed-admin": "npm run db:seed-admin --workspace=@mrf-shop/backend"
   },
   "engines": {
     "node": ">=24",

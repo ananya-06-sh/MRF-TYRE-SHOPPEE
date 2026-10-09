@@ -7,6 +7,33 @@ import { StockService } from "../services/StockService.js";
 const stockService = new StockService();
 
 export class AdminInventoryController {
+    async listAll(
+        _request: Request,
+        response: Response
+    ): Promise<void> {
+        try {
+            const inventory =
+                await stockService
+                    .listAdminInventory(true);
+
+            response.status(200).json({
+                success: true,
+                inventory
+            });
+        } catch (error: unknown) {
+            console.error(
+                "Unable to load complete Admin inventory:",
+                error
+            );
+
+            response.status(500).json({
+                success: false,
+                message:
+                    "Unable to load inventory"
+            });
+        }
+    }
+
     async list(
         _request: Request,
         response: Response

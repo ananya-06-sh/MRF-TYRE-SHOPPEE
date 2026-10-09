@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { database } from "../config/database.js";
 import {
+    OrderStatus,
     ServiceJobStatus,
     type ServiceType
 } from "../generated/prisma/enums.js";
@@ -15,6 +16,23 @@ export interface CreateServiceJobInput {
 export class ServiceJobService {
     async listJobs() {
         return database.serviceJob.findMany({
+            where: {
+                OR: [
+                    {
+                        orderId: null
+                    },
+                    {
+                        order: {
+                            is: {
+                                status: {
+                                    not:
+                                    OrderStatus.CANCELLED
+                                }
+                            }
+                        }
+                    }
+                ]
+            },
             select: {
                 id: true,
                 jobNumber: true,

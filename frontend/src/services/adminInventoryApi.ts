@@ -5,7 +5,7 @@ import type {
 } from "../types/adminInventory";
 
 const ADMIN_INVENTORY_API_URL =
-    "http://localhost:3000/api/v1/admin/inventory";
+    "/api/v1/admin/inventory";
 
 interface ApiErrorResponse {
     success: false;

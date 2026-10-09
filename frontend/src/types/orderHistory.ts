@@ -10,7 +10,8 @@ export type UserRole =
 export type ServiceType =
     | "ALIGNMENT"
     | "BALANCING"
-    | "BOTH";
+    | "BOTH"
+    | "OTHER";
 
 export type ServiceJobStatus =
     | "IN_PROGRESS"
@@ -39,6 +40,7 @@ export interface OrderHistorySummary {
     tallySyncedAt: string | null;
     createdAt: string;
     createdBy: OrderCreator;
+
     _count: {
         items: number;
         services: number;
@@ -63,6 +65,7 @@ export interface OrderHistoryServiceLine {
     id: string;
     serviceIdSnapshot: string;
     serviceNameSnapshot: string;
+    serviceTypeSnapshot: ServiceType;
     quantity: number;
     standardUnitPricePaise: number;
     billedUnitPricePaise: number;
@@ -76,6 +79,7 @@ export interface OrderHistoryServiceJob {
     id: string;
     jobNumber: string;
     serviceType: ServiceType;
+    serviceNames: string[];
     assignedTechnician: string | null;
     status: ServiceJobStatus;
     completedAt: string | null;

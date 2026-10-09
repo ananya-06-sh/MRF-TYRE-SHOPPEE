@@ -19,7 +19,7 @@ adminInventoryRouter.use(
 
 adminInventoryRouter.get(
     "/",
-    adminInventoryController.list.bind(
+    adminInventoryController.listAll.bind(
         adminInventoryController
     )
 );

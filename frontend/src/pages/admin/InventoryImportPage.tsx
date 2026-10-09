@@ -9,18 +9,60 @@ import {
     type InventoryImportResult
 } from "../../services/inventoryImportApi";
 
+const SUPPORTED_EXTENSIONS = [
+    ".csv",
+    ".xlsx"
+];
+
+function getFileExtension(
+    fileName: string
+): string {
+    const lastDotIndex =
+        fileName.lastIndexOf(".");
+
+    if (lastDotIndex < 0) {
+        return "";
+    }
+
+    return fileName
+        .slice(lastDotIndex)
+        .toLowerCase();
+}
+
+function isSupportedFile(
+    file: File
+): boolean {
+    return SUPPORTED_EXTENSIONS.includes(
+        getFileExtension(file.name)
+    );
+}
+
+function getFileTypeLabel(
+    file: File
+): string {
+    return getFileExtension(
+        file.name
+    ) === ".xlsx"
+        ? "Excel workbook"
+        : "CSV file";
+}
+
 export default function InventoryImportPage() {
     const [selectedFile, setSelectedFile] =
         useState<File | null>(null);
 
     const [result, setResult] =
-        useState<InventoryImportResult | null>(null);
+        useState<InventoryImportResult | null>(
+            null
+        );
 
     const [errorMessage, setErrorMessage] =
         useState<string | null>(null);
 
-    const [validationIssues, setValidationIssues] =
-        useState<string[]>([]);
+    const [
+        validationIssues,
+        setValidationIssues
+    ] = useState<string[]>([]);
 
     const [isImporting, setIsImporting] =
         useState(false);
@@ -28,23 +70,63 @@ export default function InventoryImportPage() {
     const [fileInputKey, setFileInputKey] =
         useState(0);
 
+    function resetMessages(): void {
+        setResult(null);
+        setErrorMessage(null);
+        setValidationIssues([]);
+    }
+
+    function handleFileSelection(
+        file: File | null
+    ): void {
+        resetMessages();
+
+        if (!file) {
+            setSelectedFile(null);
+            return;
+        }
+
+        if (!isSupportedFile(file)) {
+            setSelectedFile(null);
+
+            setErrorMessage(
+                "Select a valid .csv or .xlsx inventory file"
+            );
+
+            setFileInputKey(
+                (currentKey) =>
+                    currentKey + 1
+            );
+
+            return;
+        }
+
+        setSelectedFile(file);
+    }
+
     async function handleSubmit(
         event: FormEvent<HTMLFormElement>
-    ) {
+    ): Promise<void> {
         event.preventDefault();
 
         if (!selectedFile) {
             setErrorMessage(
-                "Select an inventory CSV file"
+                "Select a CSV or Excel inventory file"
+            );
+
+            return;
+        }
+
+        if (!isSupportedFile(selectedFile)) {
+            setErrorMessage(
+                "Only .csv and .xlsx files are supported"
             );
 
             return;
         }
 
         setIsImporting(true);
-        setResult(null);
-        setErrorMessage(null);
-        setValidationIssues([]);
+        resetMessages();
 
         try {
             const importResult =
@@ -56,18 +138,26 @@ export default function InventoryImportPage() {
             setSelectedFile(null);
 
             setFileInputKey(
-                (currentKey) => currentKey + 1
+                (currentKey) =>
+                    currentKey + 1
             );
         } catch (error: unknown) {
             if (
                 error instanceof
                 InventoryImportApiError
             ) {
-                setErrorMessage(error.message);
-                setValidationIssues(error.issues);
+                setErrorMessage(
+                    error.message
+                );
+
+                setValidationIssues(
+                    error.issues
+                );
             } else {
                 setErrorMessage(
-                    "Unable to import inventory"
+                    error instanceof Error
+                        ? error.message
+                        : "Unable to import inventory"
                 );
             }
         } finally {
@@ -91,7 +181,8 @@ export default function InventoryImportPage() {
                     </h1>
 
                     <p className="mt-1 text-sm text-slate-500">
-                        Upload existing inventory using a CSV file.
+                        Upload inventory using an
+                        Excel workbook or CSV file.
                     </p>
                 </div>
             </header>
@@ -104,20 +195,40 @@ export default function InventoryImportPage() {
 
                     <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-slate-600">
                         <li>
-                            Download and open the CSV template in Excel.
+                            Download the template and
+                            open it in Excel.
                         </li>
 
                         <li>
-                            Enter one tyre product per row.
+                            Enter one tyre product per
+                            row without changing the
+                            column headings.
                         </li>
 
                         <li>
-                            Separate compatible vehicles using
-                            the <strong>|</strong> character.
+                            Separate multiple compatible
+                            vehicles using the{" "}
+                            <strong>|</strong>{" "}
+                            character.
                         </li>
 
                         <li>
-                            Save the completed sheet as a CSV file.
+                            Save the completed file as{" "}
+                            <strong>
+                                Excel Workbook (.xlsx)
+                            </strong>{" "}
+                            or{" "}
+                            <strong>
+                                CSV (.csv)
+                            </strong>
+                            .
+                        </li>
+
+                        <li>
+                            For an Excel workbook, keep
+                            the inventory in the first
+                            worksheet and the headings
+                            in the first row.
                         </li>
                     </ol>
 
@@ -126,14 +237,19 @@ export default function InventoryImportPage() {
                         download
                         className="mt-4 inline-block rounded-xl border border-red-300 px-4 py-3 font-semibold text-red-600 hover:bg-red-50"
                     >
-                        Download CSV Template
+                        Download Spreadsheet Template
                     </a>
                 </section>
 
                 <section className="rounded-2xl bg-white p-5 shadow-sm">
                     <h2 className="font-bold text-slate-900">
-                        Upload CSV
+                        Upload Inventory File
                     </h2>
+
+                    <p className="mt-1 text-sm text-slate-500">
+                        Supported formats: `.xlsx` and
+                        `.csv`
+                    </p>
 
                     <form
                         onSubmit={handleSubmit}
@@ -142,28 +258,49 @@ export default function InventoryImportPage() {
                         <input
                             key={fileInputKey}
                             type="file"
-                            accept=".csv,text/csv"
-                            onChange={(event) => {
-                                setSelectedFile(
-                                    event.target.files?.[0] ??
+                            accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            onChange={(event) =>
+                                handleFileSelection(
+                                    event.target
+                                        .files?.[0] ??
                                     null
-                                );
-
-                                setResult(null);
-                                setErrorMessage(null);
-                                setValidationIssues([]);
-                            }}
+                                )
+                            }
                             className="block w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm"
                         />
 
                         {selectedFile && (
                             <div className="rounded-xl bg-slate-100 p-3 text-sm text-slate-700">
-                                Selected:{" "}
-                                <strong>
-                                    {selectedFile.name}
-                                </strong>
+                                <p>
+                                    Selected:{" "}
+                                    <strong>
+                                        {
+                                            selectedFile.name
+                                        }
+                                    </strong>
+                                </p>
+
+                                <p className="mt-1 text-xs text-slate-500">
+                                    {getFileTypeLabel(
+                                        selectedFile
+                                    )}{" "}
+                                    ·{" "}
+                                    {(
+                                        selectedFile.size /
+                                        1024
+                                    ).toFixed(1)}{" "}
+                                    KB
+                                </p>
                             </div>
                         )}
+
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                            Existing products with the
+                            same product ID and billing
+                            key will be updated. Stock
+                            differences will be recorded
+                            in the stock-movement history.
+                        </div>
 
                         <button
                             type="submit"
@@ -190,42 +327,53 @@ export default function InventoryImportPage() {
                             {errorMessage}
                         </p>
 
-                        {validationIssues.length > 0 && (
-                            <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-red-700">
-                                {validationIssues.map(
-                                    (issue, index) => (
-                                        <li
-                                            key={`${issue}-${index}`}
-                                        >
-                                            {issue}
-                                        </li>
-                                    )
-                                )}
-                            </ul>
-                        )}
+                        {validationIssues.length >
+                            0 && (
+                                <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-red-700">
+                                    {validationIssues.map(
+                                        (
+                                            issue,
+                                            index
+                                        ) => (
+                                            <li
+                                                key={`${issue}-${index}`}
+                                            >
+                                                {issue}
+                                            </li>
+                                        )
+                                    )}
+                                </ul>
+                            )}
                     </section>
                 )}
 
                 {result && (
                     <section className="rounded-2xl border border-green-200 bg-green-50 p-5">
                         <h2 className="font-bold text-green-800">
-                            Inventory imported successfully
+                            Inventory imported
+                            successfully
                         </h2>
 
                         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                             <ResultItem
                                 label="Rows"
-                                value={result.totalRows}
+                                value={
+                                    result.totalRows
+                                }
                             />
 
                             <ResultItem
                                 label="Created"
-                                value={result.createdCount}
+                                value={
+                                    result.createdCount
+                                }
                             />
 
                             <ResultItem
                                 label="Updated"
-                                value={result.updatedCount}
+                                value={
+                                    result.updatedCount
+                                }
                             />
 
                             <ResultItem

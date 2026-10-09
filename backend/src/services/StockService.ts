@@ -33,6 +33,12 @@ export interface StockInInput {
     newSellingPricePaise?: number;
 }
 
+export interface StockAdjustmentInput {
+    inventoryItemId: string;
+    newStock: number;
+    reason: string;
+}
+
 export type StockInResult =
     | {
     success: true;
@@ -51,14 +57,120 @@ export type StockInResult =
 };
 
 export class StockService {
-    async listAdminInventory(): Promise<
+    async listMovements(limit = 100) {
+        return database.stockMovement.findMany({
+            select: {
+                id: true,
+                type: true,
+                quantityChange: true,
+                stockBefore: true,
+                stockAfter: true,
+                supplierName: true,
+                referenceNumber: true,
+                note: true,
+                occurredAt: true,
+                inventoryItem: {
+                    select: {
+                        productId: true,
+                        patternAndSize: true
+                    }
+                },
+                performedBy: {
+                    select: {
+                        displayName: true
+                    }
+                }
+            },
+            orderBy: {
+                occurredAt: "desc"
+            },
+            take: Math.min(Math.max(limit, 1), 500)
+        });
+    }
+
+    async adjustStock(
+        performedById: string,
+        input: StockAdjustmentInput
+    ) {
+        return database.$transaction(
+            async (transaction) => {
+                const item =
+                    await transaction.inventoryItem.findUnique({
+                        where: {
+                            id: input.inventoryItemId
+                        },
+                        select: {
+                            id: true,
+                            productId: true,
+                            patternAndSize: true,
+                            currentStock: true,
+                            baseCostPaise: true
+                        }
+                    });
+
+                if (!item) {
+                    return null;
+                }
+
+                const quantityChange =
+                    input.newStock - item.currentStock;
+
+                if (quantityChange === 0) {
+                    return {
+                        ...item,
+                        currentStock: input.newStock
+                    };
+                }
+
+                const updated =
+                    await transaction.inventoryItem.update({
+                        where: {
+                            id: item.id
+                        },
+                        data: {
+                            currentStock: input.newStock,
+                            version: {
+                                increment: 1
+                            }
+                        },
+                        select: {
+                            id: true,
+                            productId: true,
+                            patternAndSize: true,
+                            currentStock: true
+                        }
+                    });
+
+                await transaction.stockMovement.create({
+                    data: {
+                        inventoryItemId: item.id,
+                        performedById,
+                        type: StockMovementType.ADJUSTMENT,
+                        quantityChange,
+                        stockBefore: item.currentStock,
+                        stockAfter: input.newStock,
+                        unitCostPaise: item.baseCostPaise,
+                        note: input.reason.trim()
+                    }
+                });
+
+                return updated;
+            }
+        );
+    }
+
+    async listAdminInventory(
+        includeInactive = false
+    ): Promise<
         AdminInventoryItem[]
     > {
         const items =
             await database.inventoryItem.findMany({
-                where: {
-                    isActive: true
-                },
+                where: includeInactive
+                    ? undefined
+                    : {
+                        isActive: true
+                    },
                 select: {
                     id: true,
                     productId: true,

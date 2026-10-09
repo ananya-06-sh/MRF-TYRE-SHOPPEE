@@ -17,7 +17,9 @@ const productSchema = z.object({
     quantity: z
         .number()
         .int("Quantity must be a whole number")
-        .positive("Quantity must be greater than zero")
+        .positive(
+            "Quantity must be greater than zero"
+        )
         .max(1000),
 
     billedUnitPriceRupees: z
@@ -37,7 +39,8 @@ const serviceSchema = z.object({
     serviceType: z.enum([
         "ALIGNMENT",
         "BALANCING",
-        "BOTH"
+        "BOTH",
+        "OTHER"
     ]),
 
     serviceName: z
@@ -48,7 +51,9 @@ const serviceSchema = z.object({
 
     quantity: z
         .number()
-        .int("Service quantity must be a whole number")
+        .int(
+            "Service quantity must be a whole number"
+        )
         .positive(
             "Service quantity must be greater than zero"
         )
@@ -78,7 +83,9 @@ const createOrderSchema = z
     .object({
         idempotencyKey: z
             .string()
-            .uuid("Invalid billing request ID"),
+            .uuid(
+                "Invalid billing request ID"
+            ),
 
         customerName: z
             .string()
@@ -106,16 +113,33 @@ const createOrderSchema = z
 
         products: z
             .array(productSchema)
-            .min(1, "Add at least one tyre")
-            .max(100),
+            .max(100)
+            .default([]),
 
-        service: serviceSchema.optional()
+        services: z
+            .array(serviceSchema)
+            .max(100)
+            .default([])
     })
     .superRefine((data, context) => {
+        if (
+            data.products.length === 0 &&
+            data.services.length === 0
+        ) {
+            context.addIssue({
+                code: "custom",
+                path: ["products"],
+                message:
+                    "Add at least one tyre or service"
+            });
+        }
+
         const productIds =
             data.products.map(
                 (product) =>
                     product.productId
+                        .trim()
+                        .toLowerCase()
             );
 
         if (
@@ -130,27 +154,23 @@ const createOrderSchema = z
             });
         }
 
-        if (
-            data.service &&
-            !data.vehiclePlateNumber?.trim()
-        ) {
-            context.addIssue({
-                code: "custom",
-                path: ["vehiclePlateNumber"],
-                message:
-                    "Vehicle plate number is required for a service job"
-            });
-        }
+        const serviceIds =
+            data.services.map(
+                (service) =>
+                    service.serviceId
+                        .trim()
+                        .toLowerCase()
+            );
 
         if (
-            data.service &&
-            !data.vehicleModel?.trim()
+            new Set(serviceIds).size !==
+            serviceIds.length
         ) {
             context.addIssue({
                 code: "custom",
-                path: ["vehicleModel"],
+                path: ["services"],
                 message:
-                    "Vehicle model is required for a service job"
+                    "The same service cannot appear twice"
             });
         }
     });
@@ -232,73 +252,76 @@ export class OrderController {
                                         })
                                     ),
 
-                            service:
+                            services:
                                 validation.data
-                                    .service
-                                    ? {
-                                        serviceId:
-                                        validation
-                                            .data
-                                            .service
-                                            .serviceId,
+                                    .services
+                                    .map(
+                                        (
+                                            service
+                                        ) => ({
+                                            serviceId:
+                                            service
+                                                .serviceId,
 
-                                        serviceType:
-                                        validation
-                                            .data
-                                            .service
-                                            .serviceType,
+                                            quantity:
+                                            service
+                                                .quantity,
 
-                                        serviceName:
-                                        validation
-                                            .data
-                                            .service
-                                            .serviceName,
-
-                                        quantity:
-                                        validation
-                                            .data
-                                            .service
-                                            .quantity,
-
-                                        standardUnitPricePaise:
-                                            Math.round(
-                                                validation
-                                                    .data
-                                                    .service
-                                                    .standardUnitPriceRupees *
-                                                100
-                                            ),
-
-                                        billedUnitPricePaise:
-                                            Math.round(
-                                                validation
-                                                    .data
-                                                    .service
-                                                    .billedUnitPriceRupees *
-                                                100
-                                            ),
-
-                                        gstRateBasisPoints:
-                                            Math.round(
-                                                validation
-                                                    .data
-                                                    .service
-                                                    .gstRatePercent *
-                                                100
-                                            )
-                                    }
-                                    : undefined
+                                            billedUnitPricePaise:
+                                                Math.round(
+                                                    service
+                                                        .billedUnitPriceRupees *
+                                                    100
+                                                )
+                                        })
+                                    )
                         }
                     );
 
             if (!result.success) {
-                response.status(409).json({
+                if (
+                    result.reason ===
+                    "INSUFFICIENT_STOCK"
+                ) {
+                    response.status(409).json({
+                        success: false,
+                        message:
+                            `Not enough stock for ${result.referenceId}`
+                    });
+
+                    return;
+                }
+
+                if (
+                    result.reason ===
+                    "PRODUCT_NOT_FOUND"
+                ) {
+                    response.status(404).json({
+                        success: false,
+                        message:
+                            `Product ${result.referenceId} was not found`
+                    });
+
+                    return;
+                }
+
+                if (
+                    result.reason ===
+                    "SERVICE_NOT_FOUND"
+                ) {
+                    response.status(404).json({
+                        success: false,
+                        message:
+                            `Service ${result.referenceId} was not found or is disabled`
+                    });
+
+                    return;
+                }
+
+                response.status(400).json({
                     success: false,
                     message:
-                        result.reason ===
-                        "INSUFFICIENT_STOCK"
-                            ? `Not enough stock for ${result.productId}`
-                            : `Product ${result.productId} was not found`
+                        "Vehicle details are required for workshop services"
                 });
 
                 return;

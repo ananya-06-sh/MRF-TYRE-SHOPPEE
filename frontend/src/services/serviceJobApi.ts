@@ -5,7 +5,7 @@ import type {
 } from "../types/serviceJob";
 
 const SERVICE_JOB_API_URL =
-    "http://localhost:3000/api/v1/service-jobs";
+    "/api/v1/service-jobs";
 
 interface ApiErrorResponse {
     success: false;

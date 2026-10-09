@@ -5,7 +5,7 @@ import type {
 } from "../types/staff";
 
 const STAFF_API_URL =
-    "http://localhost:3000/api/v1/admin/staff";
+    "/api/v1/admin/staff";
 
 interface ApiErrorResponse {
     success: false;

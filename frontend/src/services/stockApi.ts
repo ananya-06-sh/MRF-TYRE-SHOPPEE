@@ -3,9 +3,10 @@ import type {
     StaffStockInItem,
     StockInInput
 } from "../types/adminInventory";
+import type { StockMovement } from "../types/adminInventory";
 
 const STOCK_API_URL =
-    "http://localhost:3000/api/v1/admin/stock";
+    "/api/v1/admin/stock";
 
 interface ApiErrorResponse {
     success: false;
@@ -112,4 +113,31 @@ export async function getStaffStockInItems(): Promise<
         );
 
     return data.inventory;
+}
+
+export async function getStockMovements(): Promise<StockMovement[]> {
+    const response = await fetch(`${STOCK_API_URL}/movements`, {
+        credentials: "include"
+    });
+    const data = await parseResponse<{
+        success: true;
+        movements: StockMovement[];
+    }>(response);
+    return data.movements;
+}
+
+export async function adjustStock(input: {
+    inventoryItemId: string;
+    newStock: number;
+    reason: string;
+}): Promise<void> {
+    const response = await fetch(`${STOCK_API_URL}/adjustment`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify(input)
+    });
+    await parseResponse<{ success: true; message: string }>(response);
 }

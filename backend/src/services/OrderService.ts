@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { database } from "../config/database.js";
 import {
     OrderStatus,
-    StockMovementType,
-    type ServiceType
+    ServiceType,
+    StockMovementType
 } from "../generated/prisma/enums.js";
 
 export interface OrderProductInput {
@@ -14,12 +14,8 @@ export interface OrderProductInput {
 
 export interface OrderServiceInput {
     serviceId: string;
-    serviceType: ServiceType;
-    serviceName: string;
     quantity: number;
-    standardUnitPricePaise: number;
     billedUnitPricePaise: number;
-    gstRateBasisPoints: number;
 }
 
 export interface CreateOrderInput {
@@ -29,7 +25,7 @@ export interface CreateOrderInput {
     vehiclePlateNumber?: string;
     vehicleModel?: string;
     products: OrderProductInput[];
-    service?: OrderServiceInput;
+    services: OrderServiceInput[];
 }
 
 export interface CreatedOrder {
@@ -40,6 +36,12 @@ export interface CreatedOrder {
     alreadyConfirmed: boolean;
 }
 
+type OrderFailureReason =
+    | "PRODUCT_NOT_FOUND"
+    | "INSUFFICIENT_STOCK"
+    | "SERVICE_NOT_FOUND"
+    | "VEHICLE_DETAILS_REQUIRED";
+
 export type CreateOrderResult =
     | {
     success: true;
@@ -47,18 +49,14 @@ export type CreateOrderResult =
 }
     | {
     success: false;
-    reason:
-        | "PRODUCT_NOT_FOUND"
-        | "INSUFFICIENT_STOCK";
-    productId: string;
+    reason: OrderFailureReason;
+    referenceId: string;
 };
 
 class OrderCreationError extends Error {
     constructor(
-        public readonly code:
-            | "PRODUCT_NOT_FOUND"
-            | "INSUFFICIENT_STOCK",
-        public readonly productId: string
+        public readonly code: OrderFailureReason,
+        public readonly referenceId: string
     ) {
         super(code);
     }
@@ -72,6 +70,45 @@ function calculateIncludedTax(
         (totalPaise * gstRateBasisPoints) /
         (10000 + gstRateBasisPoints)
     );
+}
+
+function determineCombinedServiceType(
+    serviceTypes: ServiceType[]
+): ServiceType {
+    if (
+        serviceTypes.includes(
+            ServiceType.BOTH
+        )
+    ) {
+        return ServiceType.BOTH;
+    }
+
+    const hasAlignment =
+        serviceTypes.includes(
+            ServiceType.ALIGNMENT
+        );
+
+    const hasBalancing =
+        serviceTypes.includes(
+            ServiceType.BALANCING
+        );
+
+    if (
+        hasAlignment &&
+        hasBalancing
+    ) {
+        return ServiceType.BOTH;
+    }
+
+    if (hasAlignment) {
+        return ServiceType.ALIGNMENT;
+    }
+
+    if (hasBalancing) {
+        return ServiceType.BALANCING;
+    }
+
+    return ServiceType.OTHER;
 }
 
 export class OrderService {
@@ -95,21 +132,13 @@ export class OrderService {
                     billNumber:
                     existingOrder.billNumber,
                     grandTotalPaise:
-                    existingOrder.grandTotalPaise,
-                    status: existingOrder.status,
+                    existingOrder
+                        .grandTotalPaise,
+                    status:
+                    existingOrder.status,
                     alreadyConfirmed: true
                 }
             };
-        }
-
-        if (
-            input.service &&
-            (!input.vehiclePlateNumber?.trim() ||
-                !input.vehicleModel?.trim())
-        ) {
-            throw new Error(
-                "Vehicle details are required for a service job"
-            );
         }
 
         try {
@@ -123,16 +152,19 @@ export class OrderService {
                             );
 
                         const inventoryItems =
-                            await transaction
-                                .inventoryItem
-                                .findMany({
-                                    where: {
-                                        productId: {
-                                            in: productIds
-                                        },
-                                        isActive: true
-                                    }
-                                });
+                            productIds.length > 0
+                                ? await transaction
+                                    .inventoryItem
+                                    .findMany({
+                                        where: {
+                                            productId: {
+                                                in: productIds
+                                            },
+                                            isActive:
+                                                true
+                                        }
+                                    })
+                                : [];
 
                         const inventoryByProductId =
                             new Map(
@@ -160,7 +192,8 @@ export class OrderService {
                                     }
 
                                     if (
-                                        inventoryItem.currentStock <
+                                        inventoryItem
+                                            .currentStock <
                                         product.quantity
                                     ) {
                                         throw new OrderCreationError(
@@ -170,7 +203,8 @@ export class OrderService {
                                     }
 
                                     const lineTotalPaise =
-                                        product.billedUnitPricePaise *
+                                        product
+                                            .billedUnitPricePaise *
                                         product.quantity;
 
                                     const includedTaxPaise =
@@ -189,26 +223,101 @@ export class OrderService {
                                 }
                             );
 
-                        const serviceLine =
-                            input.service
-                                ? {
-                                    ...input.service,
-                                    lineTotalPaise:
-                                        input.service
+                        const normalizedServiceIds =
+                            input.services.map(
+                                (service) =>
+                                    service.serviceId
+                                        .trim()
+                                        .toUpperCase()
+                            );
+
+                        const catalogueServices =
+                            normalizedServiceIds
+                                .length > 0
+                                ? await transaction
+                                    .serviceCatalogueItem
+                                    .findMany({
+                                        where: {
+                                            serviceId: {
+                                                in: normalizedServiceIds
+                                            },
+                                            isActive:
+                                                true
+                                        }
+                                    })
+                                : [];
+
+                        const serviceByServiceId =
+                            new Map(
+                                catalogueServices.map(
+                                    (service) => [
+                                        service.serviceId,
+                                        service
+                                    ]
+                                )
+                            );
+
+                        const calculatedServiceLines =
+                            input.services.map(
+                                (service) => {
+                                    const normalizedServiceId =
+                                        service.serviceId
+                                            .trim()
+                                            .toUpperCase();
+
+                                    const catalogueService =
+                                        serviceByServiceId.get(
+                                            normalizedServiceId
+                                        );
+
+                                    if (!catalogueService) {
+                                        throw new OrderCreationError(
+                                            "SERVICE_NOT_FOUND",
+                                            service.serviceId
+                                        );
+                                    }
+
+                                    const lineTotalPaise =
+                                        service
                                             .billedUnitPricePaise *
-                                        input.service
-                                            .quantity,
-                                    includedTaxPaise:
+                                        service.quantity;
+
+                                    const includedTaxPaise =
                                         calculateIncludedTax(
-                                            input.service
-                                                .billedUnitPricePaise *
-                                            input.service
-                                                .quantity,
-                                            input.service
+                                            lineTotalPaise,
+                                            catalogueService
                                                 .gstRateBasisPoints
-                                        )
+                                        );
+
+                                    return {
+                                        input: service,
+                                        catalogueService,
+                                        lineTotalPaise,
+                                        includedTaxPaise
+                                    };
                                 }
-                                : null;
+                            );
+
+                        const workshopServiceLines =
+                            calculatedServiceLines.filter(
+                                (line) =>
+                                    line.catalogueService
+                                        .createsServiceJob
+                            );
+
+                        if (
+                            workshopServiceLines.length >
+                            0 &&
+                            (!input.vehiclePlateNumber
+                                    ?.trim() ||
+                                !input.vehicleModel
+                                    ?.trim())
+                        ) {
+                            throw new OrderCreationError(
+                                "VEHICLE_DETAILS_REQUIRED",
+                                ""
+                            );
+                        }
 
                         const productsTotalPaise =
                             calculatedProductLines.reduce(
@@ -219,8 +328,12 @@ export class OrderService {
                             );
 
                         const serviceTotalPaise =
-                            serviceLine
-                                ?.lineTotalPaise ?? 0;
+                            calculatedServiceLines.reduce(
+                                (total, line) =>
+                                    total +
+                                    line.lineTotalPaise,
+                                0
+                            );
 
                         const includedTaxPaise =
                             calculatedProductLines.reduce(
@@ -229,9 +342,12 @@ export class OrderService {
                                     line.includedTaxPaise,
                                 0
                             ) +
-                            (serviceLine
-                                    ?.includedTaxPaise ??
-                                0);
+                            calculatedServiceLines.reduce(
+                                (total, line) =>
+                                    total +
+                                    line.includedTaxPaise,
+                                0
+                            );
 
                         const grandTotalPaise =
                             productsTotalPaise +
@@ -246,28 +362,36 @@ export class OrderService {
                             await transaction.order.create({
                                 data: {
                                     billNumber,
+
                                     idempotencyKey:
                                     input.idempotencyKey,
+
                                     createdById,
+
                                     status:
                                     OrderStatus.CONFIRMED,
+
                                     customerName:
                                         input.customerName
                                             ?.trim() ||
                                         null,
+
                                     customerMobile:
                                         input.customerMobile
                                             ?.trim() ||
                                         null,
+
                                     vehiclePlateNumber:
                                         input.vehiclePlateNumber
                                             ?.trim()
                                             .toUpperCase() ||
                                         null,
+
                                     vehicleModel:
                                         input.vehicleModel
                                             ?.trim() ||
                                         null,
+
                                     productsTotalPaise,
                                     serviceTotalPaise,
                                     includedTaxPaise,
@@ -287,13 +411,17 @@ export class OrderService {
                                             id: line
                                                 .inventoryItem
                                                 .id,
-                                            isActive: true,
+
+                                            isActive:
+                                                true,
+
                                             currentStock: {
                                                 gte: line
                                                     .input
                                                     .quantity
                                             }
                                         },
+
                                         data: {
                                             currentStock: {
                                                 decrement:
@@ -301,18 +429,22 @@ export class OrderService {
                                                     .input
                                                     .quantity
                                             },
+
                                             version: {
-                                                increment: 1
+                                                increment:
+                                                    1
                                             }
                                         }
                                     });
 
                             if (
-                                updateResult.count !== 1
+                                updateResult.count !==
+                                1
                             ) {
                                 throw new OrderCreationError(
                                     "INSUFFICIENT_STOCK",
-                                    line.input.productId
+                                    line.input
+                                        .productId
                                 );
                             }
 
@@ -325,6 +457,7 @@ export class OrderService {
                                                 .inventoryItem
                                                 .id
                                         },
+
                                         select: {
                                             currentStock:
                                                 true
@@ -337,42 +470,53 @@ export class OrderService {
                                     data: {
                                         orderId:
                                         createdOrder.id,
+
                                         inventoryItemId:
                                         line
                                             .inventoryItem
                                             .id,
+
                                         productIdSnapshot:
                                         line
                                             .inventoryItem
                                             .productId,
+
                                         billingMatchKeySnapshot:
                                         line
                                             .inventoryItem
                                             .billingMatchKey,
+
                                         productNameSnapshot:
                                         line
                                             .inventoryItem
                                             .patternAndSize,
+
                                         quantity:
                                         line.input
                                             .quantity,
+
                                         standardUnitPricePaise:
                                         line
                                             .inventoryItem
                                             .finalSellingPricePaise,
+
                                         billedUnitPricePaise:
                                         line.input
                                             .billedUnitPricePaise,
+
                                         gstRateBasisPoints:
                                         line
                                             .inventoryItem
                                             .gstRateBasisPoints,
+
                                         includedTaxPaise:
                                         line
                                             .includedTaxPaise,
+
                                         lineTotalPaise:
                                         line
                                             .lineTotalPaise,
+
                                         baseCostPaiseSnapshot:
                                         line
                                             .inventoryItem
@@ -388,68 +532,118 @@ export class OrderService {
                                         line
                                             .inventoryItem
                                             .id,
+
                                         performedById:
                                         createdById,
+
                                         orderId:
                                         createdOrder.id,
+
                                         type:
                                         StockMovementType.SALE,
+
                                         quantityChange:
                                             -line.input
                                                 .quantity,
+
                                         stockBefore:
                                             updatedInventory
                                                 .currentStock +
                                             line.input
                                                 .quantity,
+
                                         stockAfter:
                                         updatedInventory
                                             .currentStock,
+
                                         unitCostPaise:
                                         line
                                             .inventoryItem
                                             .baseCostPaise,
+
                                         referenceNumber:
                                         billNumber,
+
                                         note:
                                             "Stock deducted from confirmed bill"
                                     }
                                 });
                         }
 
-                        if (serviceLine) {
+                        for (
+                            const line of
+                            calculatedServiceLines
+                            ) {
                             await transaction
                                 .orderServiceLine
                                 .create({
                                     data: {
                                         orderId:
                                         createdOrder.id,
+
                                         serviceIdSnapshot:
-                                        serviceLine
+                                        line
+                                            .catalogueService
                                             .serviceId,
+
                                         serviceNameSnapshot:
-                                        serviceLine
-                                            .serviceName,
+                                        line
+                                            .catalogueService
+                                            .name,
+
+                                        serviceTypeSnapshot:
+                                        line
+                                            .catalogueService
+                                            .serviceType,
+
                                         quantity:
-                                        serviceLine
+                                        line.input
                                             .quantity,
+
                                         standardUnitPricePaise:
-                                        serviceLine
-                                            .standardUnitPricePaise,
+                                        line
+                                            .catalogueService
+                                            .sellingPricePaise,
+
                                         billedUnitPricePaise:
-                                        serviceLine
+                                        line.input
                                             .billedUnitPricePaise,
+
                                         gstRateBasisPoints:
-                                        serviceLine
+                                        line
+                                            .catalogueService
                                             .gstRateBasisPoints,
+
                                         includedTaxPaise:
-                                        serviceLine
+                                        line
                                             .includedTaxPaise,
+
                                         lineTotalPaise:
-                                        serviceLine
+                                        line
                                             .lineTotalPaise
                                     }
                                 });
+                        }
+
+                        if (
+                            workshopServiceLines.length >
+                            0
+                        ) {
+                            const serviceNames =
+                                workshopServiceLines.map(
+                                    (line) =>
+                                        line
+                                            .catalogueService
+                                            .name
+                                );
+
+                            const serviceTypes =
+                                workshopServiceLines.map(
+                                    (line) =>
+                                        line
+                                            .catalogueService
+                                            .serviceType
+                                );
 
                             const jobNumber =
                                 `JOB-${Date.now()}-${randomUUID()
@@ -461,35 +655,49 @@ export class OrderService {
                                 .create({
                                     data: {
                                         jobNumber,
+
                                         orderId:
                                         createdOrder.id,
+
                                         createdById,
+
                                         vehiclePlateNumber:
                                             input
                                                 .vehiclePlateNumber!
                                                 .trim()
                                                 .toUpperCase(),
+
                                         vehicleModel:
                                             input
                                                 .vehicleModel!
                                                 .trim(),
+
                                         serviceType:
-                                        serviceLine
-                                            .serviceType
+                                            determineCombinedServiceType(
+                                                serviceTypes
+                                            ),
+
+                                        serviceNames
                                     }
                                 });
                         }
 
                         return {
                             id: createdOrder.id,
+
                             billNumber:
-                            createdOrder.billNumber,
+                            createdOrder
+                                .billNumber,
+
                             grandTotalPaise:
                             createdOrder
                                 .grandTotalPaise,
+
                             status:
                             createdOrder.status,
-                            alreadyConfirmed: false
+
+                            alreadyConfirmed:
+                                false
                         };
                     }
                 );
@@ -506,8 +714,8 @@ export class OrderService {
                 return {
                     success: false,
                     reason: error.code,
-                    productId:
-                    error.productId
+                    referenceId:
+                    error.referenceId
                 };
             }
 

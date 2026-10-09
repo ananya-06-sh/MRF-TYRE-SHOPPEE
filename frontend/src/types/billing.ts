@@ -1,3 +1,5 @@
+import type { ServiceType } from "./order";
+
 export interface BillingProductInput {
     productId: string;
     quantity: number;
@@ -6,6 +8,7 @@ export interface BillingProductInput {
 
 export interface BillingServiceInput {
     serviceId: string;
+    serviceType: ServiceType;
     serviceName: string;
     quantity: number;
     standardUnitPriceRupees: number;
@@ -20,28 +23,22 @@ export interface ConfirmBillInput {
     vehiclePlateNumber?: string;
     vehicleModel?: string;
     products: BillingProductInput[];
-    service?: BillingServiceInput;
+
+    /**
+     * New multiple-service format.
+     */
+    services: BillingServiceInput[];
 }
+
+export type OrderStatus =
+    | "CONFIRMED"
+    | "TALLY_SYNCED"
+    | "CANCELLED";
 
 export interface ConfirmedOrder {
     id: string;
     billNumber: string;
     grandTotalPaise: number;
-    status:
-        | "CONFIRMED"
-        | "TALLY_SYNCED"
-        | "CANCELLED";
+    status: OrderStatus;
     alreadyConfirmed: boolean;
-}
-export interface BillingServiceInput {
-    serviceId: string;
-    serviceType:
-        | "ALIGNMENT"
-        | "BALANCING"
-        | "BOTH";
-    serviceName: string;
-    quantity: number;
-    standardUnitPriceRupees: number;
-    billedUnitPriceRupees: number;
-    gstRatePercent: number;
 }

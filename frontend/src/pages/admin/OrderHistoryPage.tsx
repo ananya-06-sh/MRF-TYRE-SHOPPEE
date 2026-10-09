@@ -6,6 +6,7 @@ import {
 import { Link } from "react-router-dom";
 import TallyExportButton from "../../components/common/TallyExportButton";
 import {
+    cancelOrder,
     getOrderHistory,
     getOrderHistoryById
 } from "../../services/orderHistoryApi";
@@ -51,12 +52,18 @@ function getStatusLabel(
 }
 
 export default function OrderHistoryPage() {
-    const [orders, setOrders] = useState<
-        OrderHistorySummary[]
-    >([]);
+    const [orders, setOrders] =
+        useState<OrderHistorySummary[]>([]);
 
     const [selectedOrder, setSelectedOrder] =
-        useState<OrderHistoryDetail | null>(null);
+        useState<OrderHistoryDetail | null>(
+            null
+        );
+
+    const [
+        loadingOrderId,
+        setLoadingOrderId
+    ] = useState<string | null>(null);
 
     const [searchText, setSearchText] =
         useState("");
@@ -64,15 +71,18 @@ export default function OrderHistoryPage() {
     const [isLoading, setIsLoading] =
         useState(true);
 
-    const [
-        isLoadingDetails,
-        setIsLoadingDetails
-    ] = useState(false);
-
     const [errorMessage, setErrorMessage] =
         useState<string | null>(null);
 
-    async function loadOrders(search = "") {
+    const [successMessage, setSuccessMessage] =
+        useState<string | null>(null);
+
+    const [cancellingOrderId, setCancellingOrderId] =
+        useState<string | null>(null);
+
+    async function loadOrders(
+        search = ""
+    ): Promise<void> {
         setIsLoading(true);
         setErrorMessage(null);
 
@@ -92,13 +102,24 @@ export default function OrderHistoryPage() {
         }
     }
 
-    async function openOrder(orderId: string) {
-        setIsLoadingDetails(true);
+    async function toggleOrder(
+        orderId: string
+    ): Promise<void> {
+        if (selectedOrder?.id === orderId) {
+            setSelectedOrder(null);
+            setLoadingOrderId(null);
+            return;
+        }
+
+        setSelectedOrder(null);
+        setLoadingOrderId(orderId);
         setErrorMessage(null);
 
         try {
             const result =
-                await getOrderHistoryById(orderId);
+                await getOrderHistoryById(
+                    orderId
+                );
 
             setSelectedOrder(result);
         } catch (error: unknown) {
@@ -108,22 +129,68 @@ export default function OrderHistoryPage() {
                     : "Unable to load bill details"
             );
         } finally {
-            setIsLoadingDetails(false);
+            setLoadingOrderId(null);
+        }
+    }
+
+    async function handleCancelOrder(
+        order: OrderHistoryDetail
+    ): Promise<void> {
+        const isRepair =
+            order.status === "CANCELLED";
+
+        const confirmed = window.confirm(
+            isRepair
+                ? `Verify stock restoration for ${order.billNumber}?\n\nOnly quantities missing from the cancellation return will be restored. Existing returned stock will not be added twice.`
+                : `Cancel bill ${order.billNumber}?\n\nAll tyres in this bill will be returned to inventory. This action cannot be undone.`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        setCancellingOrderId(order.id);
+        setErrorMessage(null);
+        setSuccessMessage(null);
+
+        try {
+            const message =
+                await cancelOrder(order.id);
+
+            const [updatedOrders, updatedOrder] =
+                await Promise.all([
+                    getOrderHistory(searchText),
+                    getOrderHistoryById(order.id)
+                ]);
+
+            setOrders(updatedOrders);
+            setSelectedOrder(updatedOrder);
+            setSuccessMessage(message);
+        } catch (error: unknown) {
+            setErrorMessage(
+                error instanceof Error
+                    ? error.message
+                    : "Unable to cancel the bill"
+            );
+        } finally {
+            setCancellingOrderId(null);
         }
     }
 
     function handleSearch(
         event: FormEvent<HTMLFormElement>
-    ) {
+    ): void {
         event.preventDefault();
         setSelectedOrder(null);
+        setLoadingOrderId(null);
 
         void loadOrders(searchText);
     }
 
-    function clearSearch() {
+    function clearSearch(): void {
         setSearchText("");
         setSelectedOrder(null);
+        setLoadingOrderId(null);
 
         void loadOrders("");
     }
@@ -135,7 +202,7 @@ export default function OrderHistoryPage() {
     return (
         <main className="min-h-screen bg-slate-100">
             <header className="border-b border-slate-200 bg-white p-4">
-                <div className="mx-auto max-w-6xl">
+                <div className="mx-auto max-w-4xl">
                     <Link
                         to="/admin"
                         className="text-sm font-semibold text-red-600"
@@ -148,12 +215,13 @@ export default function OrderHistoryPage() {
                     </h1>
 
                     <p className="mt-1 text-sm text-slate-500">
-                        Search and inspect confirmed customer bills.
+                        Search and inspect confirmed
+                        customer bills.
                     </p>
                 </div>
             </header>
 
-            <div className="mx-auto max-w-6xl p-4">
+            <div className="mx-auto max-w-4xl p-4">
                 <form
                     onSubmit={handleSearch}
                     className="flex flex-col gap-3 rounded-2xl bg-white p-4 shadow-sm sm:flex-row"
@@ -194,131 +262,167 @@ export default function OrderHistoryPage() {
                     </div>
                 )}
 
-                <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-                    <section>
-                        <div className="mb-3 flex items-center justify-between">
-                            <h2 className="font-bold text-slate-900">
-                                Bills
-                            </h2>
+                {successMessage && (
+                    <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-4 text-green-700">
+                        {successMessage}
+                    </div>
+                )}
 
-                            <span className="text-sm text-slate-500">
-                                {orders.length} found
-                            </span>
+                <section className="mt-5">
+                    <div className="mb-3 flex items-center justify-between">
+                        <h2 className="font-bold text-slate-900">
+                            Bills
+                        </h2>
+
+                        <span className="text-sm text-slate-500">
+                            {orders.length} found
+                        </span>
+                    </div>
+
+                    {isLoading ? (
+                        <div className="rounded-2xl bg-white p-8 text-center text-slate-500">
+                            Loading bills...
                         </div>
+                    ) : orders.length === 0 ? (
+                        <div className="rounded-2xl bg-white p-8 text-center">
+                            <h3 className="font-bold text-slate-900">
+                                No bills found
+                            </h3>
 
-                        {isLoading ? (
-                            <div className="rounded-2xl bg-white p-8 text-center text-slate-500">
-                                Loading bills...
-                            </div>
-                        ) : orders.length === 0 ? (
-                            <div className="rounded-2xl bg-white p-8 text-center">
-                                <h3 className="font-bold text-slate-900">
-                                    No bills found
-                                </h3>
+                            <p className="mt-2 text-sm text-slate-500">
+                                Confirm a bill or try
+                                another search.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {orders.map((order) => {
+                                const isExpanded =
+                                    selectedOrder?.id ===
+                                    order.id;
 
-                                <p className="mt-2 text-sm text-slate-500">
-                                    Confirm a bill or try another
-                                    search.
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {orders.map((order) => (
-                                    <button
+                                const isLoadingThis =
+                                    loadingOrderId ===
+                                    order.id;
+
+                                return (
+                                    <article
                                         key={order.id}
-                                        type="button"
-                                        onClick={() => {
-                                            void openOrder(
-                                                order.id
-                                            );
-                                        }}
-                                        className={`w-full rounded-2xl bg-white p-4 text-left shadow-sm transition hover:shadow-md ${
-                                            selectedOrder?.id ===
-                                            order.id
+                                        className={`overflow-hidden rounded-2xl bg-white shadow-sm transition ${
+                                            isExpanded
                                                 ? "ring-2 ring-red-500"
-                                                : ""
+                                                : "hover:shadow-md"
                                         }`}
                                     >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div>
-                                                <p className="font-bold text-slate-900">
-                                                    {
-                                                        order.billNumber
-                                                    }
-                                                </p>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                void toggleOrder(
+                                                    order.id
+                                                );
+                                            }}
+                                            aria-expanded={
+                                                isExpanded
+                                            }
+                                            className="w-full p-4 text-left"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <p className="font-bold text-slate-900">
+                                                            {
+                                                                order.billNumber
+                                                            }
+                                                        </p>
 
-                                                <p className="mt-1 text-sm text-slate-500">
-                                                    {formatDate(
-                                                        order.createdAt
+                                                        <span className="text-sm font-bold text-red-600">
+                                                            {isExpanded
+                                                                ? "▲"
+                                                                : "▼"}
+                                                        </span>
+                                                    </div>
+
+                                                    <p className="mt-1 text-sm text-slate-500">
+                                                        {formatDate(
+                                                            order.createdAt
+                                                        )}
+                                                    </p>
+                                                </div>
+
+                                                <span
+                                                    className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(
+                                                        order.status
+                                                    )}`}
+                                                >
+                                                    {getStatusLabel(
+                                                        order.status
+                                                    )}
+                                                </span>
+                                            </div>
+
+                                            <div className="mt-3 flex items-end justify-between gap-3">
+                                                <div className="text-sm text-slate-600">
+                                                    <p>
+                                                        {order.customerName ??
+                                                            "Walk-in customer"}
+                                                    </p>
+
+                                                    <p>
+                                                        {order.vehiclePlateNumber ??
+                                                            "No vehicle number"}
+                                                    </p>
+
+                                                    <p className="mt-1 text-xs text-slate-400">
+                                                        Created
+                                                        by{" "}
+                                                        {
+                                                            order
+                                                                .createdBy
+                                                                .displayName
+                                                        }
+                                                    </p>
+                                                </div>
+
+                                                <p className="text-lg font-bold text-red-600">
+                                                    {formatPaise(
+                                                        order.grandTotalPaise
                                                     )}
                                                 </p>
                                             </div>
+                                        </button>
 
-                                            <span
-                                                className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusClasses(
-                                                    order.status
-                                                )}`}
-                                            >
-                                                {getStatusLabel(
-                                                    order.status
-                                                )}
-                                            </span>
-                                        </div>
-
-                                        <div className="mt-3 flex items-end justify-between gap-3">
-                                            <div className="text-sm text-slate-600">
-                                                <p>
-                                                    {order.customerName ??
-                                                        "Walk-in customer"}
-                                                </p>
-
-                                                <p>
-                                                    {order.vehiclePlateNumber ??
-                                                        "No vehicle number"}
-                                                </p>
-
-                                                <p className="mt-1 text-xs text-slate-400">
-                                                    Created by{" "}
-                                                    {
-                                                        order
-                                                            .createdBy
-                                                            .displayName
-                                                    }
-                                                </p>
+                                        {isLoadingThis && (
+                                            <div className="border-t border-slate-200 bg-slate-50 p-6 text-center text-slate-500">
+                                                Loading bill
+                                                details...
                                             </div>
+                                        )}
 
-                                            <p className="text-lg font-bold text-red-600">
-                                                {formatPaise(
-                                                    order.grandTotalPaise
-                                                )}
-                                            </p>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </section>
-
-                    <section>
-                        <h2 className="mb-3 font-bold text-slate-900">
-                            Bill Details
-                        </h2>
-
-                        {isLoadingDetails ? (
-                            <div className="rounded-2xl bg-white p-8 text-center text-slate-500">
-                                Loading bill details...
-                            </div>
-                        ) : !selectedOrder ? (
-                            <div className="rounded-2xl bg-white p-8 text-center text-slate-500">
-                                Select a bill to view its details.
-                            </div>
-                        ) : (
-                            <BillDetails
-                                order={selectedOrder}
-                            />
-                        )}
-                    </section>
-                </div>
+                                        {isExpanded &&
+                                            selectedOrder && (
+                                                <div className="border-t border-slate-200 bg-slate-50 p-4">
+                                                    <BillDetails
+                                                        order={
+                                                            selectedOrder
+                                                        }
+                                                        isCancelling={
+                                                            cancellingOrderId ===
+                                                            selectedOrder.id
+                                                        }
+                                                        onCancel={() => {
+                                                            void handleCancelOrder(
+                                                                selectedOrder
+                                                            );
+                                                        }}
+                                                    />
+                                                </div>
+                                            )}
+                                    </article>
+                                );
+                            })}
+                        </div>
+                    )}
+                </section>
             </div>
         </main>
     );
@@ -326,13 +430,17 @@ export default function OrderHistoryPage() {
 
 interface BillDetailsProps {
     order: OrderHistoryDetail;
+    isCancelling: boolean;
+    onCancel: () => void;
 }
 
 function BillDetails({
-                         order
+                         order,
+                         isCancelling,
+                         onCancel
                      }: BillDetailsProps) {
     return (
-        <article className="space-y-5 rounded-2xl bg-white p-5 shadow-sm">
+        <div className="space-y-5">
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 pb-4">
                 <div>
                     <p className="text-xs font-semibold uppercase text-slate-400">
@@ -344,7 +452,9 @@ function BillDetails({
                     </h3>
 
                     <p className="mt-1 text-sm text-slate-500">
-                        {formatDate(order.createdAt)}
+                        {formatDate(
+                            order.createdAt
+                        )}
                     </p>
                 </div>
 
@@ -353,7 +463,9 @@ function BillDetails({
                         order.status
                     )}`}
                 >
-                    {getStatusLabel(order.status)}
+                    {getStatusLabel(
+                        order.status
+                    )}
                 </span>
             </div>
 
@@ -398,7 +510,8 @@ function BillDetails({
                     <Detail
                         label="Created by"
                         value={
-                            order.createdBy.displayName
+                            order.createdBy
+                                .displayName
                         }
                     />
                 </div>
@@ -409,43 +522,53 @@ function BillDetails({
                     Products
                 </h4>
 
-                <div className="mt-3 space-y-3">
-                    {order.items.map((item) => (
-                        <div
-                            key={item.id}
-                            className="rounded-xl border border-slate-200 p-3"
-                        >
-                            <div className="flex justify-between gap-4">
-                                <div>
-                                    <p className="font-semibold text-slate-900">
-                                        {
-                                            item.productNameSnapshot
-                                        }
-                                    </p>
+                {order.items.length === 0 ? (
+                    <p className="mt-3 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-500">
+                        No tyres were included in this
+                        bill.
+                    </p>
+                ) : (
+                    <div className="mt-3 space-y-3">
+                        {order.items.map((item) => (
+                            <div
+                                key={item.id}
+                                className="rounded-xl border border-slate-200 bg-white p-3"
+                            >
+                                <div className="flex justify-between gap-4">
+                                    <div>
+                                        <p className="font-semibold text-slate-900">
+                                            {
+                                                item.productNameSnapshot
+                                            }
+                                        </p>
 
-                                    <p className="text-xs text-slate-500">
-                                        {
-                                            item.productIdSnapshot
-                                        }
-                                    </p>
+                                        <p className="text-xs text-slate-500">
+                                            {
+                                                item.productIdSnapshot
+                                            }
+                                        </p>
 
-                                    <p className="mt-1 text-sm text-slate-600">
-                                        {item.quantity} ×{" "}
+                                        <p className="mt-1 text-sm text-slate-600">
+                                            {
+                                                item.quantity
+                                            }{" "}
+                                            ×{" "}
+                                            {formatPaise(
+                                                item.billedUnitPricePaise
+                                            )}
+                                        </p>
+                                    </div>
+
+                                    <p className="font-bold text-slate-900">
                                         {formatPaise(
-                                            item.billedUnitPricePaise
+                                            item.lineTotalPaise
                                         )}
                                     </p>
                                 </div>
-
-                                <p className="font-bold text-slate-900">
-                                    {formatPaise(
-                                        item.lineTotalPaise
-                                    )}
-                                </p>
                             </div>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                )}
             </section>
 
             {order.services.length > 0 && (
@@ -469,10 +592,13 @@ function BillDetails({
                                         </p>
 
                                         <p className="text-sm text-slate-600">
-                                            Quantity:{" "}
                                             {
                                                 service.quantity
-                                            }
+                                            }{" "}
+                                            ×{" "}
+                                            {formatPaise(
+                                                service.billedUnitPricePaise
+                                            )}
                                         </p>
                                     </div>
 
@@ -496,7 +622,10 @@ function BillDetails({
 
                     <p className="mt-2 text-sm text-violet-800">
                         Job:{" "}
-                        {order.serviceJob.jobNumber}
+                        {
+                            order.serviceJob
+                                .jobNumber
+                        }
                     </p>
 
                     <p className="text-sm text-violet-800">
@@ -551,11 +680,54 @@ function BillDetails({
                 </div>
             </section>
 
-            <TallyExportButton
-                orderId={order.id}
-                billNumber={order.billNumber}
-            />
-        </article>
+            <div className="space-y-3">
+                <TallyExportButton
+                    orderId={order.id}
+                    billNumber={order.billNumber}
+                    allowTallyExport={
+                        order.status !== "CANCELLED"
+                    }
+                />
+
+                {order.status === "CONFIRMED" && (
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        disabled={isCancelling}
+                        className="w-full rounded-xl border border-red-300 bg-white px-5 py-3 font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400"
+                    >
+                        {isCancelling
+                            ? "Cancelling Bill..."
+                            : "Cancel Bill & Restore Stock"}
+                    </button>
+                )}
+
+                {order.status === "CANCELLED" && (
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        disabled={isCancelling}
+                        className="w-full rounded-xl border border-amber-300 bg-amber-50 px-5 py-3 font-semibold text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400"
+                    >
+                        {isCancelling
+                            ? "Checking Stock..."
+                            : "Verify / Repair Restored Stock"}
+                    </button>
+                )}
+            </div>
+
+            {order.status === "TALLY_SYNCED" && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+                    This bill has been sent to Tally. Create the required reversal in Tally before making any manual stock correction.
+                </div>
+            )}
+
+            {order.status === "CANCELLED" && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+                    This bill is cancelled. Its tyre quantities have already been restored to inventory.
+                </div>
+            )}
+        </div>
     );
 }
 

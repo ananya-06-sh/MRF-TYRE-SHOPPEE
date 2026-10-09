@@ -1,12 +1,14 @@
 import { Router } from "express";
 import { AuthController } from "../controllers/AuthController.js";
 import { authenticate } from "../middleware/authenticate.js";
+import { loginRateLimit } from "../middleware/loginRateLimit.js";
 
 const authRouter = Router();
 const authController = new AuthController();
 
 authRouter.post(
     "/login",
+    loginRateLimit,
     authController.login.bind(authController)
 );
 

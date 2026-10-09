@@ -42,6 +42,7 @@ enum ServiceType {
   ALIGNMENT
   BALANCING
   BOTH
+  OTHER
 }
 
 enum ServiceJobStatus {
@@ -174,17 +175,18 @@ model OrderItem {
 }
 
 model OrderServiceLine {
-  id                     String   @id @default(uuid()) @db.Uuid
-  orderId                String   @db.Uuid
+  id                     String      @id @default(uuid()) @db.Uuid
+  orderId                String      @db.Uuid
   serviceIdSnapshot      String
   serviceNameSnapshot    String
+  serviceTypeSnapshot    ServiceType @default(OTHER)
   quantity               Int
   standardUnitPricePaise Int
   billedUnitPricePaise   Int
   gstRateBasisPoints     Int
   includedTaxPaise       Int
   lineTotalPaise         Int
-  createdAt              DateTime @default(now())
+  createdAt              DateTime    @default(now())
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
 
@@ -199,6 +201,7 @@ model ServiceJob {
   vehiclePlateNumber String
   vehicleModel       String
   serviceType        ServiceType
+  serviceNames       String[]         @default([])
   assignedTechnician String?
   status             ServiceJobStatus @default(IN_PROGRESS)
   completedAt        DateTime?
@@ -212,4 +215,21 @@ model ServiceJob {
   @@index([createdById])
   @@index([createdAt])
   @@index([vehiclePlateNumber])
+}
+
+model ServiceCatalogueItem {
+  id                 String      @id @default(uuid()) @db.Uuid
+  serviceId          String      @unique
+  serviceType        ServiceType
+  name               String
+  description        String
+  sellingPricePaise  Int
+  gstRateBasisPoints Int         @default(1800)
+  createsServiceJob  Boolean     @default(true)
+  isActive           Boolean     @default(true)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  @@index([serviceType])
+  @@index([isActive])
 }

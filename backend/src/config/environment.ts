@@ -3,7 +3,11 @@ import { z } from "zod";
 
 const environmentSchema = z.object({
     NODE_ENV: z
-        .enum(["development", "test", "production"])
+        .enum([
+            "development",
+            "test",
+            "production"
+        ])
         .default("development"),
 
     PORT: z.coerce
@@ -15,11 +19,16 @@ const environmentSchema = z.object({
     FRONTEND_URL: z
         .string()
         .url()
-        .default("http://localhost:5173"),
+        .default(
+            "http://localhost:5173"
+        ),
 
     DATABASE_URL: z
         .string()
-        .min(1, "DATABASE_URL is required"),
+        .min(
+            1,
+            "DATABASE_URL is required"
+        ),
 
     JWT_SECRET: z
         .string()
@@ -32,7 +41,9 @@ const environmentSchema = z.object({
         .string()
         .trim()
         .min(1)
-        .default("MRF TYRE SHOP"),
+        .default(
+            "TYRE SHOPPEE"
+        ),
 
     TALLY_SALES_LEDGER_NAME: z
         .string()
@@ -53,14 +64,16 @@ const environmentSchema = z.object({
         .default("Tyre Services")
 });
 
-const result = environmentSchema.safeParse(
-    process.env
-);
+const result =
+    environmentSchema.safeParse(
+        process.env
+    );
 
 if (!result.success) {
     console.error(
         "Invalid environment configuration:",
-        result.error.flatten().fieldErrors
+        result.error.flatten()
+            .fieldErrors
     );
 
     throw new Error(
@@ -68,4 +81,5 @@ if (!result.success) {
     );
 }
 
-export const environment = result.data;
+export const environment =
+    result.data;

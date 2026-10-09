@@ -41,4 +41,16 @@ stockRouter.post(
     stockController.stockIn.bind(stockController)
 );
 
+stockRouter.get(
+    "/movements",
+    requireAdmin,
+    stockController.listMovements.bind(stockController)
+);
+
+stockRouter.post(
+    "/adjustment",
+    requireAdmin,
+    stockController.adjustStock.bind(stockController)
+);
+
 export default stockRouter;

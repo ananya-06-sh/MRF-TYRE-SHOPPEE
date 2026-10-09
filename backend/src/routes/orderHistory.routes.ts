@@ -3,28 +3,43 @@ import { OrderHistoryController } from "../controllers/OrderHistoryController.js
 import { authenticate } from "../middleware/authenticate.js";
 import { requireAdmin } from "../middleware/requireAdmin.js";
 
-const orderHistoryRouter = Router();
+const orderHistoryRouter =
+    Router();
 
 const orderHistoryController =
     new OrderHistoryController();
 
 orderHistoryRouter.use(
-    authenticate,
-    requireAdmin
+    authenticate
 );
 
 orderHistoryRouter.get(
     "/",
-    orderHistoryController.listOrders.bind(
-        orderHistoryController
-    )
+    requireAdmin,
+    orderHistoryController
+        .listOrders
+        .bind(
+            orderHistoryController
+        )
 );
 
 orderHistoryRouter.get(
     "/:orderId",
-    orderHistoryController.getOrder.bind(
-        orderHistoryController
-    )
+    orderHistoryController
+        .getOrder
+        .bind(
+            orderHistoryController
+        )
+);
+
+orderHistoryRouter.patch(
+    "/:orderId/cancel",
+    requireAdmin,
+    orderHistoryController
+        .cancelOrder
+        .bind(
+            orderHistoryController
+        )
 );
 
 export default orderHistoryRouter;

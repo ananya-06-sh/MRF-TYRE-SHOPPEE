@@ -20,6 +20,11 @@ function formatRupees(paise: number): string {
     }).format(paise / 100);
 }
 
+type InventoryStatusFilter =
+    | "ACTIVE"
+    | "INACTIVE"
+    | "ALL";
+
 export default function AdminInventoryPage() {
     const navigate = useNavigate();
 
@@ -28,6 +33,11 @@ export default function AdminInventoryPage() {
 
     const [search, setSearch] =
         useState("");
+
+    const [statusFilter, setStatusFilter] =
+        useState<InventoryStatusFilter>(
+            "ACTIVE"
+        );
 
     const [isLoading, setIsLoading] =
         useState(true);
@@ -41,11 +51,22 @@ export default function AdminInventoryPage() {
     const filteredInventory = useMemo(() => {
         const query = search.trim().toLowerCase();
 
+        const inventoryByStatus =
+            inventory.filter((item) => {
+                if (statusFilter === "ALL") {
+                    return true;
+                }
+
+                return statusFilter === "ACTIVE"
+                    ? item.isActive
+                    : !item.isActive;
+            });
+
         if (!query) {
-            return inventory;
+            return inventoryByStatus;
         }
 
-        return inventory.filter((item) =>
+        return inventoryByStatus.filter((item) =>
             [
                 item.productId,
                 item.patternAndSize,
@@ -56,7 +77,14 @@ export default function AdminInventoryPage() {
                 value.toLowerCase().includes(query)
             )
         );
-    }, [inventory, search]);
+    }, [inventory, search, statusFilter]);
+
+    const activeCount = inventory.filter(
+        (item) => item.isActive
+    ).length;
+
+    const inactiveCount =
+        inventory.length - activeCount;
 
     async function loadInventory(): Promise<void> {
         setIsLoading(true);
@@ -82,11 +110,16 @@ export default function AdminInventoryPage() {
         void loadInventory();
     }, []);
 
-    async function handleDisable(
+    async function handleStatusChange(
         item: AdminInventoryItem
     ): Promise<void> {
+        const nextIsActive =
+            !item.isActive;
+
         const confirmed = window.confirm(
-            `Disable ${item.patternAndSize}? It will no longer appear in Staff search.`
+            nextIsActive
+                ? `Enable ${item.patternAndSize}? It will appear in Staff search and Stock-In again.`
+                : `Disable ${item.patternAndSize}? It will be hidden from Staff search and Stock-In, but its data and history will be preserved.`
         );
 
         if (!confirmed) {
@@ -99,24 +132,34 @@ export default function AdminInventoryPage() {
         try {
             await changeInventoryActiveStatus(
                 item.id,
-                false
+                nextIsActive
             );
 
             setInventory((currentInventory) =>
-                currentInventory.filter(
+                currentInventory.map(
                     (currentItem) =>
-                        currentItem.id !== item.id
+                        currentItem.id === item.id
+                            ? {
+                                ...currentItem,
+                                isActive:
+                                nextIsActive
+                            }
+                            : currentItem
                 )
             );
 
             setMessage(
-                `${item.patternAndSize} was disabled.`
+                `${item.patternAndSize} was ${
+                    nextIsActive
+                        ? "enabled"
+                        : "disabled"
+                }.`
             );
         } catch (requestError: unknown) {
             setError(
                 requestError instanceof Error
                     ? requestError.message
-                    : "Unable to disable tyre."
+                    : "Unable to change tyre status."
             );
         }
     }
@@ -182,17 +225,71 @@ export default function AdminInventoryPage() {
                     className="mt-6 w-full rounded-xl border border-slate-300 bg-white px-4 py-3"
                 />
 
+                <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-white p-2 shadow-sm">
+                    <button
+                        type="button"
+                        onClick={() =>
+                            setStatusFilter("ACTIVE")
+                        }
+                        className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                            statusFilter === "ACTIVE"
+                                ? "bg-green-600 text-white"
+                                : "text-slate-600 hover:bg-slate-100"
+                        }`}
+                    >
+                        Active ({activeCount})
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() =>
+                            setStatusFilter("INACTIVE")
+                        }
+                        className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                            statusFilter === "INACTIVE"
+                                ? "bg-slate-700 text-white"
+                                : "text-slate-600 hover:bg-slate-100"
+                        }`}
+                    >
+                        Disabled ({inactiveCount})
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() =>
+                            setStatusFilter("ALL")
+                        }
+                        className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+                            statusFilter === "ALL"
+                                ? "bg-red-600 text-white"
+                                : "text-slate-600 hover:bg-slate-100"
+                        }`}
+                    >
+                        All ({inventory.length})
+                    </button>
+                </div>
+
                 <p className="my-4 text-sm font-semibold text-slate-600">
                     {isLoading
                         ? "Loading inventory..."
-                        : `${filteredInventory.length} active tyres`}
+                        : `${filteredInventory.length} ${
+                            statusFilter === "ACTIVE"
+                                ? "active"
+                                : statusFilter === "INACTIVE"
+                                    ? "disabled"
+                                    : "total"
+                        } tyre(s)`}
                 </p>
 
                 <section className="grid gap-4 lg:grid-cols-2">
                     {filteredInventory.map((item) => (
                         <article
                             key={item.id}
-                            className="rounded-2xl bg-white p-5 shadow-sm"
+                            className={`rounded-2xl bg-white p-5 shadow-sm ${
+                                item.isActive
+                                    ? ""
+                                    : "border border-slate-300 opacity-75"
+                            }`}
                         >
                             <div className="flex items-start justify-between gap-3">
                                 <div>
@@ -207,6 +304,12 @@ export default function AdminInventoryPage() {
                                     <p className="text-sm text-slate-500">
                                         {item.billingMatchKey}
                                     </p>
+
+                                    {!item.isActive && (
+                                        <span className="mt-2 inline-block rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-700">
+                                            Disabled
+                                        </span>
+                                    )}
                                 </div>
 
                                 <span
@@ -295,13 +398,19 @@ export default function AdminInventoryPage() {
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        void handleDisable(
+                                        void handleStatusChange(
                                             item
                                         );
                                     }}
-                                    className="flex-1 rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-600"
+                                    className={
+                                        item.isActive
+                                            ? "flex-1 rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-600"
+                                            : "flex-1 rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700"
+                                    }
                                 >
-                                    Disable
+                                    {item.isActive
+                                        ? "Disable"
+                                        : "Enable"}
                                 </button>
                             </div>
                         </article>
@@ -311,7 +420,7 @@ export default function AdminInventoryPage() {
                 {!isLoading &&
                     filteredInventory.length === 0 && (
                         <div className="rounded-2xl bg-white p-8 text-center text-slate-500">
-                            No matching active tyres found.
+                            No matching tyres found in this section.
                         </div>
                     )}
             </div>
